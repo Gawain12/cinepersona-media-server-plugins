@@ -2,7 +2,7 @@
 
 Plex 目前没有与 Emby/Jellyfin 等价的、可稳定拦截服务端播放事件的原生服务端插件接口；Plex 官方提供的是 Webhooks，且官方文档明确说明 `media.scrobble` Webhook 需要 Plex Pass。
 
-因此本目录提供一个可部署的 Plex companion relay：接收 Plex 的 `media.scrobble` multipart webhook，保留 Plex 的媒体识别信息，再转发到 CinePersona 的 `/api/v1/webhook/plex`。它适合已经具备 Plex Webhooks 权限的用户；它不会伪装成一个 Plex 原生插件，也不会绕过 Plex Pass 限制。
+因此本目录提供一个可部署的 Plex companion relay：接收 Plex 的 `media.scrobble` multipart webhook，保留 Plex 的媒体识别信息，再转发到 CinePersona 的 `/v1/webhook/plex`。它适合已经具备 Plex Webhooks 权限的用户；它不会伪装成一个 Plex 原生插件，也不会绕过 Plex Pass 限制。
 
 ## 运行
 

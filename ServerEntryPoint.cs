@@ -116,7 +116,7 @@ namespace Emby.Plugin.CinePersona
                 }
             };
 
-            var endpoint = new Uri(serverUri, "/api/v1/webhook/emby");
+            var endpoint = new Uri(serverUri, "/v1/webhook/emby");
             var json = _jsonSerializer.SerializeToString(payload);
 
             using (var request = new HttpRequestMessage(HttpMethod.Post, endpoint))

@@ -8,6 +8,8 @@ CinePersona 的媒体服务器同步插件集合：电影播放完成度达到 8
 - `jellyfin/Jellyfin.Plugin.CinePersona`：Jellyfin 原生 C# 插件。
 - `plex/CinePersona.PlexRelay`：Plex Webhook companion relay。Plex 官方目前没有等价的稳定原生服务端播放事件插件接口，因此这个组件负责接收 Plex Webhook 并转发到 CinePersona；它不绕过 Plex Pass 限制。
 
+插件发送到 CinePersona 的实际 API 路径是 `/v1/webhook/emby`、`/v1/webhook/jellyfin` 和 `/v1/webhook/plex`；服务器地址只需要填写 `https://cinepersona.com` 或 `https://test.gawyn.de`。
+
 ## Emby 支持内容
 
 - Emby Server 4.7+

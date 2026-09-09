@@ -146,7 +146,7 @@ func forwardToCinePersona(ctx context.Context, cfg config, payload []byte) error
 		return err
 	}
 
-	endpoint := strings.TrimRight(cfg.CinePersonaURL, "/") + "/api/v1/webhook/plex"
+	endpoint := strings.TrimRight(cfg.CinePersonaURL, "/") + "/v1/webhook/plex"
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, &body)
 	if err != nil {
 		return err

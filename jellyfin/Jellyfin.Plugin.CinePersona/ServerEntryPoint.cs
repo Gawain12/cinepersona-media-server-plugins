@@ -113,7 +113,7 @@ public sealed class ServerEntryPoint : IHostedService
             }
         };
 
-        var endpoint = new Uri(serverUri, "/api/v1/webhook/jellyfin");
+        var endpoint = new Uri(serverUri, "/v1/webhook/jellyfin");
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
         request.Headers.Add("X-API-Key", apiKey);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
