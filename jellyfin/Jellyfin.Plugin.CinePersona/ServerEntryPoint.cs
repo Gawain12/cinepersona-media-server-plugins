@@ -1,10 +1,10 @@
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
 using Jellyfin.Plugin.CinePersona.Configuration;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Session;
-using MediaBrowser.Model.Serialization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -18,16 +18,13 @@ public sealed class ServerEntryPoint : IHostedService
 
     private readonly ISessionManager _sessionManager;
     private readonly ILogger<ServerEntryPoint> _logger;
-    private readonly IJsonSerializer _jsonSerializer;
 
     public ServerEntryPoint(
         ISessionManager sessionManager,
-        ILogger<ServerEntryPoint> logger,
-        IJsonSerializer jsonSerializer)
+        ILogger<ServerEntryPoint> logger)
     {
         _sessionManager = sessionManager;
         _logger = logger;
-        _jsonSerializer = jsonSerializer;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -121,7 +118,7 @@ public sealed class ServerEntryPoint : IHostedService
         request.Headers.Add("X-API-Key", apiKey);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         request.Content = new StringContent(
-            _jsonSerializer.SerializeToString(payload),
+            JsonSerializer.Serialize(payload),
             Encoding.UTF8,
             "application/json");
 
