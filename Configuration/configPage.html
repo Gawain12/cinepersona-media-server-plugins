@@ -2,14 +2,114 @@
 <html>
 <head>
     <title>CinePersona</title>
+    <style>
+        .cinepersonaConfigurationPage .content-primary {
+            max-width: 760px;
+        }
+
+        .cinepersonaHero {
+            display: grid;
+            grid-template-columns: 92px minmax(0, 1fr);
+            gap: 20px;
+            align-items: center;
+            margin: 12px 0 28px;
+            padding: 24px;
+            border: 1px solid rgba(67, 175, 255, 0.28);
+            border-radius: 18px;
+            background:
+                radial-gradient(circle at 12% 10%, rgba(0, 174, 255, 0.22), transparent 42%),
+                linear-gradient(135deg, #0b1220 0%, #101d35 55%, #0a0e18 100%);
+            box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
+        }
+
+        .cinepersonaHeroMark {
+            display: block;
+            width: 92px;
+            height: 92px;
+            border-radius: 22px;
+            box-shadow: 0 0 28px rgba(23, 174, 255, 0.26);
+        }
+
+        .cinepersonaHeroEyebrow {
+            margin: 0 0 7px;
+            color: #72c9ff;
+            font-size: 0.72em;
+            font-weight: 700;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        .cinepersonaHeroTitle {
+            margin: 0;
+            color: #f4f8ff;
+            font-size: clamp(1.3em, 3vw, 1.8em);
+            line-height: 1.22;
+        }
+
+        .cinepersonaHeroCopy {
+            margin: 9px 0 0;
+            color: rgba(231, 241, 255, 0.78);
+            line-height: 1.6;
+        }
+
+        .cinepersonaHeroMeta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 16px;
+            margin-top: 14px;
+            color: rgba(231, 241, 255, 0.58);
+            font-size: 0.82em;
+        }
+
+        .cinepersonaSectionTitle {
+            margin: 0 0 8px;
+        }
+
+        .cinepersonaSectionCopy {
+            margin: 0 0 22px;
+        }
+
+        .cinepersonaHint {
+            color: #72c9ff;
+        }
+
+        @media (max-width: 560px) {
+            .cinepersonaHero {
+                grid-template-columns: 64px minmax(0, 1fr);
+                gap: 14px;
+                padding: 18px;
+            }
+
+            .cinepersonaHeroMark {
+                width: 64px;
+                height: 64px;
+                border-radius: 16px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button">
         <div class="content-primary">
+            <section class="cinepersonaHero" aria-labelledby="cinepersonaHeroTitle">
+                <a href="https://cinepersona.com" target="_blank" rel="noopener noreferrer">
+                    <img class="cinepersonaHeroMark" src="https://cinepersona.com/cinepersona-icon.png" alt="CinePersona" />
+                </a>
+                <div>
+                    <p class="cinepersonaHeroEyebrow">Media watch sync</p>
+                    <h2 id="cinepersonaHeroTitle" class="cinepersonaHeroTitle">把看过的电影，留在你的 CinePersona</h2>
+                    <p class="cinepersonaHeroCopy">Emby 电影播放达到 80% 后，自动记录到你的观影档案。</p>
+                    <div class="cinepersonaHeroMeta">
+                        <span>80%+ 完成度</span>
+                        <span>TMDB / IMDb</span>
+                        <span>Movie only</span>
+                    </div>
+                </div>
+            </section>
+
             <form class="cinepersonaConfigurationForm">
-                <h2>CinePersona 观影同步设置</h2>
-                <p>观影完成度达到 80% 后，插件会将电影记录同步到 CinePersona。</p>
-                <p>请先在 CinePersona 设置中创建具有 <code>sync.write</code> 权限的 API Key。</p>
+                <h2 class="cinepersonaSectionTitle">连接设置</h2>
+                <p class="cinepersonaSectionCopy">请填写 CinePersona 地址和具有 <code>sync.write</code> 权限的 API Key。</p>
 
                 <div class="inputContainer">
                     <label class="inputLabel" for="txtApiKey">API Key:</label>
@@ -20,7 +120,7 @@
                 <div class="inputContainer">
                     <label class="inputLabel" for="txtServerUrl">CinePersona 地址:</label>
                     <input is="emby-input" type="url" id="txtServerUrl" name="txtServerUrl" value="https://cinepersona.com" required />
-                    <div class="fieldDescription">测试环境可填写 https://test.gawyn.de</div>
+                    <div class="fieldDescription">正式环境：<span class="cinepersonaHint">https://cinepersona.com</span>　测试环境：https://test.gawyn.de</div>
                 </div>
 
                 <button is="emby-button" type="submit" class="raised button-submit block">保存</button>

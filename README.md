@@ -18,6 +18,10 @@ CinePersona 的媒体服务器同步插件集合：电影播放完成度达到 8
 - 自动携带 TMDB ID、IMDb ID、片名和年份
 - 支持 CinePersona 正式环境和测试环境
 
+## 视觉资源
+
+`assets/emby-catalog-thumb.png` 是用于 Emby 插件目录的 16:9 横版封面，复用了 CinePersona 现有图标；`assets/emby-catalog-preview.png` 可作为目录详情页预览图。
+
 ## 安装
 
 1. 在 CinePersona 中创建 API Key，并授予 `sync.write` 权限。
