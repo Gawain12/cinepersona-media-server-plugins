@@ -1,0 +1,40 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Restore Emby plugin
+        run: dotnet restore Emby.Plugin.CinePersona.csproj
+
+      - name: Build Emby plugin
+        run: dotnet build Emby.Plugin.CinePersona.csproj -c Release --no-restore
+
+      - name: Restore Jellyfin plugin
+        run: dotnet restore jellyfin/Jellyfin.Plugin.CinePersona/Jellyfin.Plugin.CinePersona.csproj
+
+      - name: Build Jellyfin plugin
+        run: dotnet build jellyfin/Jellyfin.Plugin.CinePersona/Jellyfin.Plugin.CinePersona.csproj -c Release --no-restore
+
+      - name: Test Plex relay
+        working-directory: plex/CinePersona.PlexRelay
+        run: go test ./...
+
+      - name: Build Plex relay
+        working-directory: plex/CinePersona.PlexRelay
+        run: go build ./...

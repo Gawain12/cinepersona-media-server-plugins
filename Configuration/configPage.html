@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CinePersona</title>
+</head>
+<body>
+    <div data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button">
+        <div class="content-primary">
+            <form class="cinepersonaConfigurationForm">
+                <h2>CinePersona 观影同步设置</h2>
+                <p>观影完成度达到 80% 后，插件会将电影记录同步到 CinePersona。</p>
+                <p>请先在 CinePersona 设置中创建具有 <code>sync.write</code> 权限的 API Key。</p>
+
+                <div class="inputContainer">
+                    <label class="inputLabel" for="txtApiKey">API Key:</label>
+                    <input is="emby-input" type="password" id="txtApiKey" name="txtApiKey" autocomplete="off" required />
+                    <div class="fieldDescription">格式示例：cpk_xxxxxxxx_yyyyyyyy</div>
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel" for="txtServerUrl">CinePersona 地址:</label>
+                    <input is="emby-input" type="url" id="txtServerUrl" name="txtServerUrl" value="https://cinepersona.com" required />
+                    <div class="fieldDescription">测试环境可填写 https://test.gawyn.de</div>
+                </div>
+
+                <button is="emby-button" type="submit" class="raised button-submit block">保存</button>
+            </form>
+        </div>
+
+        <script type="text/javascript">
+            var CinePersonaConfig = {
+                pluginUniqueId: "f62e8471-469b-43d8-b57f-f4a4d7d10001"
+            };
+
+            $('.cinepersonaConfigurationForm').on('pageshow', function () {
+                var form = this;
+                ApiClient.getPluginConfiguration(CinePersonaConfig.pluginUniqueId).then(function (config) {
+                    $('#txtApiKey', form).val(config.ApiKey || '');
+                    $('#txtServerUrl', form).val(config.ServerUrl || 'https://cinepersona.com');
+                });
+            });
+
+            $('.cinepersonaConfigurationForm').on('submit', function () {
+                var form = this;
+                ApiClient.getPluginConfiguration(CinePersonaConfig.pluginUniqueId).then(function (config) {
+                    config.ApiKey = $('#txtApiKey', form).val();
+                    config.ServerUrl = $('#txtServerUrl', form).val();
+                    ApiClient.updatePluginConfiguration(CinePersonaConfig.pluginUniqueId, config).then(function (result) {
+                        Dashboard.processPluginConfigurationUpdateResult(result);
+                    });
+                });
+                return false;
+            });
+        </script>
+    </div>
+</body>
+</html>

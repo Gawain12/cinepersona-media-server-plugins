@@ -1,0 +1,57 @@
+name: Release plugins
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Build Emby plugin
+        run: dotnet build Emby.Plugin.CinePersona.csproj -c Release
+
+      - name: Build Jellyfin plugin
+        run: dotnet build jellyfin/Jellyfin.Plugin.CinePersona/Jellyfin.Plugin.CinePersona.csproj -c Release
+
+      - name: Test and build Plex relay
+        working-directory: plex/CinePersona.PlexRelay
+        run: |
+          go test ./...
+          go build -o cinepersona-plex-relay .
+
+      - name: Package release artifacts
+        run: |
+          mkdir -p dist
+          cp bin/Release/netstandard2.0/Emby.Plugin.CinePersona.dll dist/
+          cp jellyfin/Jellyfin.Plugin.CinePersona/bin/Release/net9.0/Jellyfin.Plugin.CinePersona.dll dist/
+          cp plex/CinePersona.PlexRelay/cinepersona-plex-relay dist/
+          cp jellyfin/build.yaml dist/jellyfin-build.yaml
+          tar -czf dist/cinepersona-plex-relay-linux-amd64.tar.gz -C dist cinepersona-plex-relay
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/Emby.Plugin.CinePersona.dll
+            dist/Jellyfin.Plugin.CinePersona.dll
+            dist/cinepersona-plex-relay-linux-amd64.tar.gz
+            dist/jellyfin-build.yaml
