@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Emby.Plugin.CinePersona.Configuration;
 using MediaBrowser.Controller.Entities.Movies;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Plugins;
 using MediaBrowser.Controller.Session;
 using MediaBrowser.Model.Logging;
@@ -32,10 +33,9 @@ namespace Emby.Plugin.CinePersona
             _jsonSerializer = jsonSerializer;
         }
 
-        public Task RunAsync()
+        public void Run()
         {
             _sessionManager.PlaybackStopped += OnPlaybackStopped;
-            return Task.CompletedTask;
         }
 
         private async void OnPlaybackStopped(object sender, PlaybackStopEventArgs e)

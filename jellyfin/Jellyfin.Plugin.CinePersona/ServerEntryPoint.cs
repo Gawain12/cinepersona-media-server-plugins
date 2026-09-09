@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using Jellyfin.Plugin.CinePersona.Configuration;
 using MediaBrowser.Controller.Entities.Movies;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Session;
 using MediaBrowser.Model.Serialization;
 using Microsoft.Extensions.Hosting;
