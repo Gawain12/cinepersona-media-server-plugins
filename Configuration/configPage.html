@@ -107,7 +107,7 @@
                 </div>
             </section>
 
-            <form class="cinepersonaConfigurationForm">
+            <form class="cinepersonaConfigurationForm" onsubmit="return CinePersonaConfig.submit(event);">
                 <h2 class="cinepersonaSectionTitle">连接设置</h2>
                 <p class="cinepersonaSectionCopy">请填写 CinePersona 地址和具有 <code>sync.write</code> 权限的 API Key。</p>
 
@@ -129,28 +129,46 @@
 
         <script type="text/javascript">
             var CinePersonaConfig = {
-                pluginUniqueId: "f62e8471-469b-43d8-b57f-f4a4d7d10001"
-            };
+                pluginUniqueId: "f62e8471-469b-43d8-b57f-f4a4d7d10001",
 
-            $('.cinepersonaConfigurationForm').on('pageshow', function () {
-                var form = this;
-                ApiClient.getPluginConfiguration(CinePersonaConfig.pluginUniqueId).then(function (config) {
-                    $('#txtApiKey', form).val(config.ApiKey || '');
-                    $('#txtServerUrl', form).val(config.ServerUrl || 'https://cinepersona.com');
-                });
-            });
+                load: function () {
+                    var apiKeyInput = document.getElementById('txtApiKey');
+                    var serverUrlInput = document.getElementById('txtServerUrl');
+                    if (!apiKeyInput || !serverUrlInput) {
+                        return;
+                    }
 
-            $('.cinepersonaConfigurationForm').on('submit', function () {
-                var form = this;
-                ApiClient.getPluginConfiguration(CinePersonaConfig.pluginUniqueId).then(function (config) {
-                    config.ApiKey = $('#txtApiKey', form).val();
-                    config.ServerUrl = $('#txtServerUrl', form).val();
-                    ApiClient.updatePluginConfiguration(CinePersonaConfig.pluginUniqueId, config).then(function (result) {
+                    ApiClient.getPluginConfiguration(CinePersonaConfig.pluginUniqueId).then(function (config) {
+                        apiKeyInput.value = config.ApiKey || '';
+                        serverUrlInput.value = config.ServerUrl || 'https://cinepersona.com';
+                    });
+                },
+
+                submit: function (event) {
+                    if (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+
+                    var apiKeyInput = document.getElementById('txtApiKey');
+                    var serverUrlInput = document.getElementById('txtServerUrl');
+                    if (!apiKeyInput || !serverUrlInput) {
+                        return false;
+                    }
+
+                    ApiClient.getPluginConfiguration(CinePersonaConfig.pluginUniqueId).then(function (config) {
+                        config.ApiKey = apiKeyInput.value;
+                        config.ServerUrl = serverUrlInput.value;
+                        return ApiClient.updatePluginConfiguration(CinePersonaConfig.pluginUniqueId, config);
+                    }).then(function (result) {
                         Dashboard.processPluginConfigurationUpdateResult(result);
                     });
-                });
-                return false;
-            });
+
+                    return false;
+                }
+            };
+
+            CinePersonaConfig.load();
         </script>
     </div>
 </body>
