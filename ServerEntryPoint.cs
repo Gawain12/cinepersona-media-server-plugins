@@ -8,6 +8,7 @@ using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Plugins;
 using MediaBrowser.Controller.Session;
+using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Logging;
 using MediaBrowser.Model.Serialization;
 
@@ -20,15 +21,18 @@ namespace Emby.Plugin.CinePersona
         private static readonly HttpClient HttpClient = new HttpClient();
 
         private readonly ISessionManager _sessionManager;
+        private readonly IUserDataManager _userDataManager;
         private readonly ILogger _logger;
         private readonly IJsonSerializer _jsonSerializer;
 
         public ServerEntryPoint(
             ISessionManager sessionManager,
+            IUserDataManager userDataManager,
             ILogManager logManager,
             IJsonSerializer jsonSerializer)
         {
             _sessionManager = sessionManager;
+            _userDataManager = userDataManager;
             _logger = logManager.GetLogger("CinePersona");
             _jsonSerializer = jsonSerializer;
         }
@@ -36,6 +40,7 @@ namespace Emby.Plugin.CinePersona
         public void Run()
         {
             _sessionManager.PlaybackStopped += OnPlaybackStopped;
+            _userDataManager.UserDataSaved += OnUserDataSaved;
         }
 
         private async void OnPlaybackStopped(object sender, PlaybackStopEventArgs e)
@@ -50,7 +55,50 @@ namespace Emby.Plugin.CinePersona
             }
         }
 
+        private async void OnUserDataSaved(object sender, UserDataSaveEventArgs e)
+        {
+            // Emby uses TogglePlayed when the user clicks "Mark as played".
+            // PlaybackStopped does not fire for that action, so treat it as a
+            // completed movie at 100% and send the same server-side event.
+            if (e == null || e.UserData == null || !(e.Item is Movie movie))
+            {
+                return;
+            }
+
+            try
+            {
+                var runtimeTicks = movie.RunTimeTicks ?? 0;
+                if (e.SaveReason == UserDataSaveReason.TogglePlayed && e.UserData.Played)
+                {
+                    var positionTicks = runtimeTicks > 0
+                        ? runtimeTicks
+                        : e.UserData.PlaybackPositionTicks;
+                    await SyncMovieAsync(movie, positionTicks, "手动标记看过", null).ConfigureAwait(false);
+                    return;
+                }
+
+                if (e.SaveReason == UserDataSaveReason.UpdateUserRating && e.UserData.Rating.HasValue)
+                {
+                    await SyncMovieAsync(movie, runtimeTicks, "Emby 星级评价", e.UserData.Rating).ConfigureAwait(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.ErrorException("CinePersona 手动标记同步触发异常", ex);
+            }
+        }
+
         private async Task SyncPlaybackAsync(PlaybackStopEventArgs e)
+        {
+            if (!(e.Item is Movie movie))
+            {
+                return;
+            }
+
+            await SyncMovieAsync(movie, e.PlaybackPositionTicks ?? 0, "播放完成", null).ConfigureAwait(false);
+        }
+
+        private async Task SyncMovieAsync(Movie movie, long positionTicks, string trigger, double? rating)
         {
             var plugin = Plugin.Instance;
             if (plugin == null)
@@ -66,13 +114,7 @@ namespace Emby.Plugin.CinePersona
                 return;
             }
 
-            if (!(e.Item is Movie movie))
-            {
-                return;
-            }
-
             var runtimeTicks = movie.RunTimeTicks ?? 0;
-            var positionTicks = e.PlaybackPositionTicks ?? 0;
             if (!HasReachedCompletion(runtimeTicks, positionTicks))
             {
                 var progress = runtimeTicks > 0
@@ -97,7 +139,7 @@ namespace Emby.Plugin.CinePersona
 
             var payload = new
             {
-                Event = "playback.stop",
+                Event = rating.HasValue ? "userData.rating" : "playback.stop",
                 Item = new
                 {
                     Type = "Movie",
@@ -113,6 +155,11 @@ namespace Emby.Plugin.CinePersona
                 PlaybackInfo = new
                 {
                     PositionTicks = positionTicks
+                },
+                UserData = new
+                {
+                    Played = true,
+                    Rating = rating
                 }
             };
 
@@ -129,7 +176,7 @@ namespace Emby.Plugin.CinePersona
                 {
                     if (response.IsSuccessStatusCode)
                     {
-                        _logger.Info($"CinePersona 同步成功: {movie.Name} ({(int)response.StatusCode})");
+                        _logger.Info($"CinePersona 同步成功: {movie.Name}，触发方式：{trigger} ({(int)response.StatusCode})");
                         return;
                     }
 
@@ -149,6 +196,7 @@ namespace Emby.Plugin.CinePersona
         public void Dispose()
         {
             _sessionManager.PlaybackStopped -= OnPlaybackStopped;
+            _userDataManager.UserDataSaved -= OnUserDataSaved;
         }
     }
 }
