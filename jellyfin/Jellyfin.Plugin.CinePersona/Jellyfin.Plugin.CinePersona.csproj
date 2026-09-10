@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <!-- Jellyfin 10.10.x runs on .NET 8; keep the plugin loadable on the
+         server version currently used by the test host. -->
+    <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>Jellyfin.Plugin.CinePersona</RootNamespace>
     <AssemblyName>Jellyfin.Plugin.CinePersona</AssemblyName>
     <Version>0.1.0</Version>
@@ -13,10 +15,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Jellyfin.Controller" Version="10.11.5">
+    <PackageReference Include="Jellyfin.Controller" Version="10.10.7">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="Jellyfin.Model" Version="10.11.5">
+    <PackageReference Include="Jellyfin.Model" Version="10.10.7">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
   </ItemGroup>
