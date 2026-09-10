@@ -5,6 +5,7 @@ using Jellyfin.Plugin.CinePersona.Configuration;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Session;
+using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -17,25 +18,30 @@ public sealed class ServerEntryPoint : IHostedService
     private static readonly HttpClient HttpClient = new();
 
     private readonly ISessionManager _sessionManager;
+    private readonly IUserDataManager _userDataManager;
     private readonly ILogger<ServerEntryPoint> _logger;
 
     public ServerEntryPoint(
         ISessionManager sessionManager,
+        IUserDataManager userDataManager,
         ILogger<ServerEntryPoint> logger)
     {
         _sessionManager = sessionManager;
+        _userDataManager = userDataManager;
         _logger = logger;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _sessionManager.PlaybackStopped += OnPlaybackStopped;
+        _userDataManager.UserDataSaved += OnUserDataSaved;
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _sessionManager.PlaybackStopped -= OnPlaybackStopped;
+        _userDataManager.UserDataSaved -= OnUserDataSaved;
         return Task.CompletedTask;
     }
 
@@ -51,7 +57,44 @@ public sealed class ServerEntryPoint : IHostedService
         }
     }
 
+    private async void OnUserDataSaved(object? sender, UserDataSaveEventArgs e)
+    {
+        // Jellyfin emits UserDataSaved, rather than PlaybackStopped, when the
+        // user clicks "Mark as played". Only handle the explicit played toggle
+        // so ordinary playback progress saves do not create duplicate rows.
+        if (e?.Item is not Movie movie
+            || e.UserData is null
+            || e.SaveReason != UserDataSaveReason.TogglePlayed
+            || !e.UserData.Played)
+        {
+            return;
+        }
+
+        try
+        {
+            var runtimeTicks = movie.RunTimeTicks ?? 0;
+            var positionTicks = runtimeTicks > 0
+                ? runtimeTicks
+                : e.UserData.PlaybackPositionTicks ?? 0;
+            await SyncMovieAsync(movie, positionTicks, "手动标记看过").ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "CinePersona manual watched sync failed");
+        }
+    }
+
     private async Task SyncPlaybackAsync(PlaybackStopEventArgs e)
+    {
+        if (e.Item is not Movie movie)
+        {
+            return;
+        }
+
+        await SyncMovieAsync(movie, e.PlaybackPositionTicks ?? 0, "播放停止").ConfigureAwait(false);
+    }
+
+    private async Task SyncMovieAsync(Movie movie, long positionTicks, string trigger)
     {
         var configuration = Plugin.Instance?.Configuration;
         if (configuration is null)
@@ -66,13 +109,7 @@ public sealed class ServerEntryPoint : IHostedService
             return;
         }
 
-        if (e.Item is not Movie movie)
-        {
-            return;
-        }
-
         var runtimeTicks = movie.RunTimeTicks ?? 0;
-        var positionTicks = e.PlaybackPositionTicks ?? 0;
         if (!HasReachedCompletion(runtimeTicks, positionTicks))
         {
             var progress = runtimeTicks > 0 ? (double)positionTicks / runtimeTicks : 0d;
@@ -126,7 +163,10 @@ public sealed class ServerEntryPoint : IHostedService
         using var response = await HttpClient.SendAsync(request, timeout.Token).ConfigureAwait(false);
         if (response.IsSuccessStatusCode)
         {
-            _logger.LogInformation("CinePersona sync succeeded for {Movie}", movie.Name);
+            _logger.LogInformation(
+                "CinePersona sync succeeded for {Movie}, trigger: {Trigger}",
+                movie.Name,
+                trigger);
             return;
         }
 
