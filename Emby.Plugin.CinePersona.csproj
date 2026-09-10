@@ -13,7 +13,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="mediabrowser.server.core" Version="4.8.0.80" />
+    <!-- Compile against the Emby 4.8.10 API used by the current test host. -->
+    <PackageReference Include="mediabrowser.server.core" Version="4.8.10" />
     <PackageReference Include="System.Memory" Version="4.5.5" />
   </ItemGroup>
 
