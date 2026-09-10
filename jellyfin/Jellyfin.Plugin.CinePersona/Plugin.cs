@@ -17,11 +17,27 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         Instance = this;
         PluginPaths = applicationPaths;
         InjectWebScript(applicationPaths);
+        _ = RetryWebScriptInjectionAsync(applicationPaths);
     }
 
     public static Plugin? Instance { get; private set; }
 
     internal static IApplicationPaths? PluginPaths { get; private set; }
+
+    private static async Task RetryWebScriptInjectionAsync(IApplicationPaths applicationPaths)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(20)).ConfigureAwait(false);
+            InjectWebScript(applicationPaths);
+            await Task.Delay(TimeSpan.FromSeconds(45)).ConfigureAwait(false);
+            InjectWebScript(applicationPaths);
+        }
+        catch
+        {
+            // A server shutdown during the retry window is harmless.
+        }
+    }
 
     public override string Name => "CinePersona";
 

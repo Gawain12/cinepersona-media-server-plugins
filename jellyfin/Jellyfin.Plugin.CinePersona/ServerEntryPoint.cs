@@ -6,6 +6,7 @@ using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Session;
 using MediaBrowser.Model.Entities;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -18,17 +19,18 @@ public sealed class ServerEntryPoint : IHostedService
     private static readonly HttpClient HttpClient = new();
 
     private readonly ISessionManager _sessionManager;
-    private readonly IUserDataManager _userDataManager;
+    private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<ServerEntryPoint> _logger;
+    private IUserDataManager? _userDataManager;
 
     public ServerEntryPoint(
         ISessionManager sessionManager,
-        IUserDataManager userDataManager,
-        ILogger<ServerEntryPoint> logger)
+        ILogger<ServerEntryPoint> logger,
+        IServiceProvider serviceProvider)
     {
         _sessionManager = sessionManager;
-        _userDataManager = userDataManager;
         _logger = logger;
+        _serviceProvider = serviceProvider;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -37,15 +39,25 @@ public sealed class ServerEntryPoint : IHostedService
         {
             Plugin.InjectWebScript(applicationPaths, _logger);
         }
+        _userDataManager = _serviceProvider.GetService<IUserDataManager>();
         _sessionManager.PlaybackStopped += OnPlaybackStopped;
-        _userDataManager.UserDataSaved += OnUserDataSaved;
+        if (_userDataManager is not null)
+        {
+            _userDataManager.UserDataSaved += OnUserDataSaved;
+        }
+        _logger.LogInformation(
+            "CinePersona service started; user data events: {UserDataEvents}",
+            _userDataManager is not null ? "enabled" : "unavailable");
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _sessionManager.PlaybackStopped -= OnPlaybackStopped;
-        _userDataManager.UserDataSaved -= OnUserDataSaved;
+        if (_userDataManager is not null)
+        {
+            _userDataManager.UserDataSaved -= OnUserDataSaved;
+        }
         return Task.CompletedTask;
     }
 
