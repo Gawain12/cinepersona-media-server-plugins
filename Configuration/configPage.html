@@ -98,11 +98,60 @@
     </style>
 </head>
 <body>
+    <style type="text/css">
+        .cinepersonaConfigurationPage .content-primary {
+            max-width: 680px;
+        }
+
+        .cinepersonaHero {
+            display: grid !important;
+            grid-template-columns: 56px minmax(0, 1fr) !important;
+            gap: 16px !important;
+            align-items: center !important;
+            margin: 8px 0 24px !important;
+            padding: 18px 20px !important;
+            border: 1px solid rgba(67, 175, 255, 0.28) !important;
+            border-radius: 14px !important;
+            background: radial-gradient(circle at 12% 10%, rgba(0, 174, 255, 0.22), transparent 42%), linear-gradient(135deg, #0b1220 0%, #101d35 55%, #0a0e18 100%) !important;
+            box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18) !important;
+        }
+
+        .cinepersonaHeroMark {
+            display: block !important;
+            width: 56px !important;
+            height: 56px !important;
+            border-radius: 14px !important;
+        }
+
+        .cinepersonaSaveStatus {
+            min-height: 1.5em;
+            margin-top: 12px;
+            line-height: 1.45;
+        }
+
+        .cinepersonaSaveStatus[data-state="saving"] { color: rgba(231, 241, 255, 0.7); }
+        .cinepersonaSaveStatus[data-state="success"] { color: #238653; }
+        .cinepersonaSaveStatus[data-state="error"] { color: #b42318; }
+
+        @media (max-width: 560px) {
+            .cinepersonaHero {
+                grid-template-columns: 48px minmax(0, 1fr) !important;
+                gap: 12px !important;
+                padding: 16px !important;
+            }
+
+            .cinepersonaHeroMark {
+                width: 48px !important;
+                height: 48px !important;
+                border-radius: 12px !important;
+            }
+        }
+    </style>
     <div data-role="page" class="page type-interior pluginConfigurationPage cinepersonaConfigurationPage" data-require="emby-input,emby-button">
         <div class="content-primary">
             <section class="cinepersonaHero" aria-labelledby="cinepersonaHeroTitle">
                 <a href="https://cinepersona.com" target="_blank" rel="noopener noreferrer">
-                    <img class="cinepersonaHeroMark" src="https://cinepersona.com/cinepersona-icon.png" alt="CinePersona" />
+                    <img class="cinepersonaHeroMark" src="https://cinepersona.com/cinepersona-icon.png" alt="CinePersona" width="56" height="56" style="width:56px;height:56px" />
                 </a>
                 <div>
                     <p class="cinepersonaHeroEyebrow">Media watch sync</p>
