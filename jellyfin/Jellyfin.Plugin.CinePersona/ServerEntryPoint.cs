@@ -1,7 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using MediaBrowser.Common.Configuration;
 using Jellyfin.Plugin.CinePersona.Configuration;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
@@ -21,23 +20,23 @@ public sealed class ServerEntryPoint : IHostedService
     private readonly ISessionManager _sessionManager;
     private readonly IUserDataManager _userDataManager;
     private readonly ILogger<ServerEntryPoint> _logger;
-    private readonly IApplicationPaths _applicationPaths;
 
     public ServerEntryPoint(
         ISessionManager sessionManager,
         IUserDataManager userDataManager,
-        ILogger<ServerEntryPoint> logger,
-        IApplicationPaths applicationPaths)
+        ILogger<ServerEntryPoint> logger)
     {
         _sessionManager = sessionManager;
         _userDataManager = userDataManager;
         _logger = logger;
-        _applicationPaths = applicationPaths;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        Plugin.InjectWebScript(_applicationPaths, _logger);
+        if (Plugin.ApplicationPaths is not null)
+        {
+            Plugin.InjectWebScript(Plugin.ApplicationPaths, _logger);
+        }
         _sessionManager.PlaybackStopped += OnPlaybackStopped;
         _userDataManager.UserDataSaved += OnUserDataSaved;
         return Task.CompletedTask;

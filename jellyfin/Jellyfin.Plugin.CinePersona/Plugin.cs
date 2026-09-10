@@ -15,10 +15,13 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
+        ApplicationPaths = applicationPaths;
         InjectWebScript(applicationPaths);
     }
 
     public static Plugin? Instance { get; private set; }
+
+    internal static IApplicationPaths? ApplicationPaths { get; private set; }
 
     public override string Name => "CinePersona";
 
