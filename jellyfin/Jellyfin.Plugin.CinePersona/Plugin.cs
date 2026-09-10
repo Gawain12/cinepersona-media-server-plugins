@@ -5,6 +5,7 @@ using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.CinePersona;
 
@@ -48,19 +49,25 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         };
     }
 
-    private static void InjectWebScript(IApplicationPaths applicationPaths)
+    internal static void InjectWebScript(IApplicationPaths applicationPaths, ILogger? logger = null)
     {
         try
         {
-            var webPath = applicationPaths?.WebPath;
-            if (string.IsNullOrWhiteSpace(webPath))
+            var webPaths = new[]
             {
-                return;
-            }
+                Environment.GetEnvironmentVariable("JELLYFIN_WEB_DIR"),
+                applicationPaths?.WebPath,
+                Path.Combine(applicationPaths?.ProgramSystemPath ?? string.Empty, "jellyfin-web"),
+                Path.Combine(applicationPaths?.ProgramSystemPath ?? string.Empty, "dashboard-ui")
+            };
 
-            var indexPath = Path.Combine(webPath, "index.html");
-            if (!File.Exists(indexPath))
+            var indexPath = webPaths
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Select(path => Path.Combine(path!, "index.html"))
+                .FirstOrDefault(File.Exists);
+            if (indexPath is null)
             {
+                logger?.LogDebug("CinePersona could not find Jellyfin Web index for injection");
                 return;
             }
 
@@ -77,11 +84,11 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 ? contents.Insert(bodyIndex, script)
                 : contents + script;
             File.WriteAllText(indexPath, contents);
+            logger?.LogInformation("CinePersona Web review script injected into {IndexPath}", indexPath);
         }
-        catch
+        catch (Exception exception)
         {
-            // A missing or read-only web directory must not prevent the
-            // server plugin from loading. Retry on the next server restart.
+            logger?.LogWarning(exception, "CinePersona Web review script injection failed");
         }
     }
 }
