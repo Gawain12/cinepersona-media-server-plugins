@@ -75,7 +75,7 @@ public sealed class ServerEntryPoint : IHostedService
             var runtimeTicks = movie.RunTimeTicks ?? 0;
             var positionTicks = runtimeTicks > 0
                 ? runtimeTicks
-                : e.UserData.PlaybackPositionTicks ?? 0;
+                : e.UserData.PlaybackPositionTicks;
             await SyncMovieAsync(movie, positionTicks, "手动标记看过").ConfigureAwait(false);
         }
         catch (Exception exception)
