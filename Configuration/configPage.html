@@ -1,33 +1,27 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>CinePersona</title>
-    <style>
+    <style type="text/css">
         .cinepersonaConfigurationPage .content-primary {
             max-width: 680px;
         }
 
         .cinepersonaHero {
-            display: grid;
-            grid-template-columns: 56px minmax(0, 1fr);
-            gap: 16px;
-            align-items: center;
-            margin: 8px 0 24px;
-            padding: 18px 20px;
-            border: 1px solid rgba(67, 175, 255, 0.28);
-            border-radius: 14px;
-            background:
-                radial-gradient(circle at 12% 10%, rgba(0, 174, 255, 0.22), transparent 42%),
-                linear-gradient(135deg, #0b1220 0%, #101d35 55%, #0a0e18 100%);
-            box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
+            display: grid !important;
+            grid-template-columns: 56px minmax(0, 1fr) !important;
+            gap: 16px !important;
+            align-items: center !important;
+            margin: 8px 0 24px !important;
+            padding: 18px 20px !important;
+            border: 1px solid rgba(67, 175, 255, 0.28) !important;
+            border-radius: 14px !important;
+            background: radial-gradient(circle at 12% 10%, rgba(0, 174, 255, 0.22), transparent 42%), linear-gradient(135deg, #0b1220 0%, #101d35 55%, #0a0e18 100%) !important;
+            box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18) !important;
         }
 
         .cinepersonaHeroMark {
-            display: block;
-            width: 56px;
-            height: 56px;
-            border-radius: 14px;
-            box-shadow: 0 0 28px rgba(23, 174, 255, 0.26);
+            display: block !important;
+            width: 56px !important;
+            height: 56px !important;
+            border-radius: 14px !important;
+            box-shadow: 0 0 28px rgba(23, 174, 255, 0.26) !important;
         }
 
         .cinepersonaHeroEyebrow {
@@ -61,66 +55,7 @@
         }
 
         .cinepersonaHint {
-            color: #72c9ff;
-        }
-
-        .cinepersonaSaveStatus {
-            min-height: 1.5em;
-            margin-top: 12px;
-            line-height: 1.45;
-        }
-
-        .cinepersonaSaveStatus[data-state="saving"] {
-            color: rgba(231, 241, 255, 0.7);
-        }
-
-        .cinepersonaSaveStatus[data-state="success"] {
-            color: #71d69a;
-        }
-
-        .cinepersonaSaveStatus[data-state="error"] {
-            color: #ff9d9d;
-        }
-
-        @media (max-width: 560px) {
-            .cinepersonaHero {
-                grid-template-columns: 48px minmax(0, 1fr);
-                gap: 12px;
-                padding: 16px;
-            }
-
-            .cinepersonaHeroMark {
-                width: 48px;
-                height: 48px;
-                border-radius: 12px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <style type="text/css">
-        .cinepersonaConfigurationPage .content-primary {
-            max-width: 680px;
-        }
-
-        .cinepersonaHero {
-            display: grid !important;
-            grid-template-columns: 56px minmax(0, 1fr) !important;
-            gap: 16px !important;
-            align-items: center !important;
-            margin: 8px 0 24px !important;
-            padding: 18px 20px !important;
-            border: 1px solid rgba(67, 175, 255, 0.28) !important;
-            border-radius: 14px !important;
-            background: radial-gradient(circle at 12% 10%, rgba(0, 174, 255, 0.22), transparent 42%), linear-gradient(135deg, #0b1220 0%, #101d35 55%, #0a0e18 100%) !important;
-            box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18) !important;
-        }
-
-        .cinepersonaHeroMark {
-            display: block !important;
-            width: 56px !important;
-            height: 56px !important;
-            border-radius: 14px !important;
+            color: #2380b7;
         }
 
         .cinepersonaSaveStatus {
@@ -147,7 +82,7 @@
             }
         }
     </style>
-    <div data-role="page" class="page type-interior pluginConfigurationPage cinepersonaConfigurationPage" data-require="emby-input,emby-button">
+    <div data-role="page" class="page type-interior pluginConfigurationPage cinepersonaConfigurationPage" data-require="emby-input,emby-button" data-controller="__plugin/CinePersonaConfigurationPageJS">
         <div class="content-primary">
             <section class="cinepersonaHero" aria-labelledby="cinepersonaHeroTitle">
                 <a href="https://cinepersona.com" target="_blank" rel="noopener noreferrer">
@@ -160,13 +95,13 @@
                 </div>
             </section>
 
-            <form class="cinepersonaConfigurationForm" onsubmit="return CinePersonaConfig.submit(event);">
+            <form id="cinepersonaConfigurationForm" class="cinepersonaConfigurationForm">
                 <h2 class="cinepersonaSectionTitle">连接设置</h2>
                 <p class="cinepersonaSectionCopy">填写 CinePersona 地址和 API Key。</p>
 
                 <div class="inputContainer">
                     <label class="inputLabel" for="txtApiKey">API Key</label>
-                    <input is="emby-input" type="password" id="txtApiKey" name="txtApiKey" autocomplete="off" placeholder="cpk_..." required />
+                    <input is="emby-input" type="password" id="txtApiKey" name="txtApiKey" autocomplete="off" placeholder="cpk_..." />
                     <div class="fieldDescription">已配置的 Key 不会回显；需要更换时直接输入新的 Key。</div>
                 </div>
 
@@ -181,74 +116,4 @@
             </form>
         </div>
 
-        <script type="text/javascript">
-            var CinePersonaConfig = {
-                pluginUniqueId: "f62e8471-469b-43d8-b57f-f4a4d7d10001",
-
-                setStatus: function (message, state) {
-                    var status = document.getElementById('cinepersonaSaveStatus');
-                    if (!status) {
-                        return;
-                    }
-                    status.textContent = message || '';
-                    status.dataset.state = state || '';
-                },
-
-                load: function () {
-                    var apiKeyInput = document.getElementById('txtApiKey');
-                    var serverUrlInput = document.getElementById('txtServerUrl');
-                    if (!apiKeyInput || !serverUrlInput) {
-                        return;
-                    }
-
-                    return ApiClient.getPluginConfiguration(CinePersonaConfig.pluginUniqueId).then(function (config) {
-                        apiKeyInput.value = config.ApiKey || '';
-                        serverUrlInput.value = config.ServerUrl || 'https://cinepersona.com';
-                    }).catch(function (error) {
-                        console.error('CinePersona 配置读取失败', error);
-                        CinePersonaConfig.setStatus('读取配置失败，请刷新后重试。', 'error');
-                    });
-                },
-
-                submit: function (event) {
-                    if (event) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                    }
-
-                    var apiKeyInput = document.getElementById('txtApiKey');
-                    var serverUrlInput = document.getElementById('txtServerUrl');
-                    if (!apiKeyInput || !serverUrlInput) {
-                        return false;
-                    }
-
-                    var saveButton = document.getElementById('btnSave');
-                    if (saveButton) {
-                        saveButton.disabled = true;
-                    }
-                    CinePersonaConfig.setStatus('正在保存…', 'saving');
-
-                    ApiClient.getPluginConfiguration(CinePersonaConfig.pluginUniqueId).then(function (config) {
-                        config.ApiKey = apiKeyInput.value;
-                        config.ServerUrl = serverUrlInput.value;
-                        return ApiClient.updatePluginConfiguration(CinePersonaConfig.pluginUniqueId, config);
-                    }).then(function () {
-                        CinePersonaConfig.setStatus('已保存，插件会使用新配置。', 'success');
-                    }).catch(function (error) {
-                        console.error('CinePersona 配置保存失败', error);
-                        CinePersonaConfig.setStatus('保存失败，请检查地址和 API Key 后重试。', 'error');
-                    }).then(function () {
-                        if (saveButton) {
-                            saveButton.disabled = false;
-                        }
-                    });
-
-                    return false;
-                }
-            };
-
-            CinePersonaConfig.load();
-        </script>
     </div>
-</body>
-</html>

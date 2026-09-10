@@ -43,6 +43,11 @@ namespace Emby.Plugin.CinePersona
                 {
                     Name = "cinepersona",
                     EmbeddedResourcePath = GetType().Namespace + ".Configuration.configPage.html"
+                },
+                new PluginPageInfo
+                {
+                    Name = "CinePersonaConfigurationPageJS",
+                    EmbeddedResourcePath = GetType().Namespace + ".Configuration.CinePersonaConfigurationPageJS.js"
                 }
             };
         }
