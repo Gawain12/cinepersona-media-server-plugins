@@ -1,11 +1,32 @@
 define([], function () {
     return function (page) {
         var pluginUniqueId = "f62e8471-469b-43d8-b57f-f4a4d7d10001";
-        var form = page.querySelector("#cinepersonaConfigurationForm");
-        var apiKeyInput = page.querySelector("#txtApiKey");
-        var serverUrlInput = page.querySelector("#txtServerUrl");
-        var saveButton = page.querySelector("#btnSave");
-        var status = page.querySelector("#cinepersonaSaveStatus");
+        var form;
+        var apiKeyInput;
+        var serverUrlInput;
+        var saveButton;
+        var status;
+        var initialized = false;
+
+        function initialize() {
+            if (initialized) {
+                return;
+            }
+
+            form = page.querySelector("#cinepersonaConfigurationForm");
+            apiKeyInput = page.querySelector("#txtApiKey");
+            serverUrlInput = page.querySelector("#txtServerUrl");
+            saveButton = page.querySelector("#btnSave");
+            status = page.querySelector("#cinepersonaSaveStatus");
+
+            if (!form || !apiKeyInput || !serverUrlInput) {
+                return;
+            }
+
+            initialized = true;
+            form.addEventListener("submit", submit);
+            load();
+        }
 
         function setStatus(message, state) {
             if (!status) {
@@ -71,11 +92,7 @@ define([], function () {
             return false;
         }
 
-        if (form) {
-            form.addEventListener("submit", submit);
-        }
-
-        page.addEventListener("viewshow", load);
-        load();
+        page.addEventListener("viewshow", initialize);
+        initialize();
     };
 });
