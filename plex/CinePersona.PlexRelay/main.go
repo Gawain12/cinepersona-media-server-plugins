@@ -30,10 +30,12 @@ type plexPayload struct {
 }
 
 type plexMetadata struct {
-	Type  string     `json:"type"`
-	Title string     `json:"title"`
-	Year  int        `json:"year"`
-	Guid  []plexGuid `json:"Guid"`
+	Type       string     `json:"type"`
+	Title      string     `json:"title"`
+	Year       int        `json:"year"`
+	UserRating *float64   `json:"userRating"`
+	Rating     *float64   `json:"rating"`
+	Guid       []plexGuid `json:"Guid"`
 }
 
 type plexGuid struct {
@@ -92,13 +94,26 @@ func handleWebhook(w http.ResponseWriter, r *http.Request, cfg config) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid Plex payload"})
 		return
 	}
-	if !strings.EqualFold(event.Event, "media.scrobble") || !strings.EqualFold(event.Metadata.Type, "movie") {
+	isScrobble := strings.EqualFold(event.Event, "media.scrobble")
+	isRating := strings.EqualFold(event.Event, "media.rate")
+	if (!isScrobble && !isRating) || !strings.EqualFold(event.Metadata.Type, "movie") {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ignored"})
 		return
 	}
 
+	if isRating {
+		rating := event.Metadata.UserRating
+		if rating == nil {
+			rating = event.Metadata.Rating
+		}
+		if rating == nil || *rating < 0.5 || *rating > 10 {
+			writeJSON(w, http.StatusOK, map[string]string{"status": "ignored"})
+			return
+		}
+	}
+
 	if err := forwardToCinePersona(r.Context(), cfg, payload); err != nil {
-		log.Printf("forwarding Plex scrobble failed: %v", err)
+		log.Printf("forwarding Plex event failed: %v", err)
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "CinePersona request failed"})
 		return
 	}

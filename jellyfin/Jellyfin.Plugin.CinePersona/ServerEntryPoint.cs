@@ -59,28 +59,40 @@ public sealed class ServerEntryPoint : IHostedService
 
     private async void OnUserDataSaved(object? sender, UserDataSaveEventArgs e)
     {
-        // Jellyfin emits UserDataSaved, rather than PlaybackStopped, when the
-        // user clicks "Mark as played". Only handle the explicit played toggle
-        // so ordinary playback progress saves do not create duplicate rows.
-        if (e?.Item is not Movie movie
-            || e.UserData is null
-            || e.SaveReason != UserDataSaveReason.TogglePlayed
-            || !e.UserData.Played)
+        if (e?.Item is not Movie movie || e.UserData is null)
         {
             return;
         }
 
-        try
+        if (e.SaveReason == UserDataSaveReason.TogglePlayed && e.UserData.Played)
         {
-            var runtimeTicks = movie.RunTimeTicks ?? 0;
-            var positionTicks = runtimeTicks > 0
-                ? runtimeTicks
-                : e.UserData.PlaybackPositionTicks;
-            await SyncMovieAsync(movie, positionTicks, "手动标记看过").ConfigureAwait(false);
+            try
+            {
+                var runtimeTicks = movie.RunTimeTicks ?? 0;
+                var positionTicks = runtimeTicks > 0
+                    ? runtimeTicks
+                    : e.UserData.PlaybackPositionTicks;
+                await SyncMovieAsync(movie, positionTicks, "手动标记看过").ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "CinePersona manual watched sync failed");
+            }
         }
-        catch (Exception exception)
+        else if (e.SaveReason == UserDataSaveReason.UpdateUserRating && e.UserData.Rating.HasValue)
         {
-            _logger.LogError(exception, "CinePersona manual watched sync failed");
+            try
+            {
+                await SyncMovieAsync(
+                    movie,
+                    movie.RunTimeTicks ?? 0,
+                    "Jellyfin 星级评价",
+                    e.UserData.Rating).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "CinePersona rating sync failed");
+            }
         }
     }
 
@@ -94,7 +106,7 @@ public sealed class ServerEntryPoint : IHostedService
         await SyncMovieAsync(movie, e.PlaybackPositionTicks ?? 0, "播放停止").ConfigureAwait(false);
     }
 
-    private async Task SyncMovieAsync(Movie movie, long positionTicks, string trigger)
+    private async Task SyncMovieAsync(Movie movie, long positionTicks, string trigger, double? rating = null)
     {
         var configuration = Plugin.Instance?.Configuration;
         if (configuration is null)
@@ -110,7 +122,7 @@ public sealed class ServerEntryPoint : IHostedService
         }
 
         var runtimeTicks = movie.RunTimeTicks ?? 0;
-        if (!HasReachedCompletion(runtimeTicks, positionTicks))
+        if (!rating.HasValue && !HasReachedCompletion(runtimeTicks, positionTicks))
         {
             var progress = runtimeTicks > 0 ? (double)positionTicks / runtimeTicks : 0d;
             _logger.LogDebug("Skipping {Movie}: completion was {Progress:P0}", movie.Name, progress);
@@ -131,7 +143,7 @@ public sealed class ServerEntryPoint : IHostedService
         movie.ProviderIds.TryGetValue("Tmdb", out var tmdbId);
         var payload = new
         {
-            Event = "playback.stop",
+            Event = rating.HasValue ? "userData.rating" : "playback.stop",
             Item = new
             {
                 Type = "Movie",
@@ -147,6 +159,11 @@ public sealed class ServerEntryPoint : IHostedService
             PlaybackInfo = new
             {
                 PositionTicks = positionTicks
+            },
+            UserData = new
+            {
+                Played = true,
+                Rating = rating
             }
         };
 
@@ -161,6 +178,17 @@ public sealed class ServerEntryPoint : IHostedService
 
         using var timeout = new CancellationTokenSource(RequestTimeout);
         using var response = await HttpClient.SendAsync(request, timeout.Token).ConfigureAwait(false);
+        var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        if ((int)response.StatusCode == 200
+            && responseBody.IndexOf("\"status\":\"ignored\"", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            _logger.LogInformation(
+                "CinePersona sync ignored for {Movie}, trigger: {Trigger}",
+                movie.Name,
+                trigger);
+            return;
+        }
+
         if (response.IsSuccessStatusCode)
         {
             _logger.LogInformation(
@@ -170,7 +198,6 @@ public sealed class ServerEntryPoint : IHostedService
             return;
         }
 
-        var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         _logger.LogWarning(
             "CinePersona sync failed for {Movie}: {StatusCode} {ResponseBody}",
             movie.Name,

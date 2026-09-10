@@ -1,6 +1,6 @@
 # Jellyfin.Plugin.CinePersona
 
-Jellyfin 原生服务端插件：电影播放完成度达到 80% 或手动标记为看过后，自动将观影记录同步到 CinePersona。
+Jellyfin 原生服务端插件：电影播放完成度达到 80%、手动标记为看过或提交个人星级评价后，自动将观影记录同步到 CinePersona。
 
 当前仅同步 `Movie`。电视剧、季度、单集、音乐、书籍和其他类型会被跳过，不会被强制当作电影提交。
 

@@ -1,6 +1,6 @@
 # CinePersona Media Server Plugins
 
-CinePersona 的媒体服务器同步插件集合：电影播放完成度达到 80% 后，自动将观影记录同步到 CinePersona。
+CinePersona 的媒体服务器同步插件集合：电影播放完成度达到 80% 后，自动将观影记录同步到 CinePersona；电影个人评分也会同步，且不会覆盖已有评论。
 
 当前包含：
 
@@ -15,6 +15,7 @@ CinePersona 的媒体服务器同步插件集合：电影播放完成度达到 8
 - Emby Server 4.7+
 - 仅处理 `Movie`
 - 仅在 `PositionTicks / RunTimeTicks >= 0.8` 时同步
+- 支持 Emby 电影个人评分同步
 - 自动携带 TMDB ID、IMDb ID、片名和年份
 - 支持 CinePersona 正式环境和测试环境
 
