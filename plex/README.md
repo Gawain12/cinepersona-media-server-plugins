@@ -1,8 +1,10 @@
 # CinePersona Plex Relay
 
-Plex 目前没有与 Emby/Jellyfin 等价的、可稳定拦截服务端播放事件的原生服务端插件接口；Plex 官方提供的是 Webhooks，且官方文档明确说明 `media.scrobble` Webhook 需要 Plex Pass。
+Plex 目前没有与 Emby/Jellyfin 等价的、可稳定拦截服务端播放事件的原生服务端插件接口；Plex 官方提供的是 Webhooks，且官方文档明确说明 Webhook 需要 Plex Pass。
 
-因此本目录提供一个可部署的 Plex companion relay：接收 Plex 的 `media.scrobble` multipart webhook，保留 Plex 的媒体识别信息，再转发到 CinePersona 的 `/v1/webhook/plex`。它适合已经具备 Plex Webhooks 权限的用户；它不会伪装成一个 Plex 原生插件，也不会绕过 Plex Pass 限制。
+因此本目录提供一个可部署的 Plex companion relay：接收 Plex 的 `media.scrobble`（电影观看完成）和 `media.rate`（电影个人评分）multipart webhook，保留 Plex 的媒体识别信息，再转发到 CinePersona 的 `/v1/webhook/plex`。它只处理电影；电视剧等类型会被忽略。它适合已经具备 Plex Webhooks 权限的用户；它不会伪装成一个 Plex 原生插件，也不会绕过 Plex Pass 限制。
+
+Plex Webhook 会带电影评分，但不会可靠提供 CinePersona 所需的评论正文。评论仍可在 CinePersona 的电影编辑弹窗中填写；评分同步不会覆盖已有评论或产生重看记录。
 
 ## 运行
 

@@ -1,0 +1,16 @@
+{
+  "category": "General",
+  "changelog": "Add Web rating and short-review popup for Jellyfin movies.",
+  "description": "Automatically records completed Jellyfin movie plays to CinePersona.",
+  "guid": "f62e8471-469b-43d8-b57f-f4a4d7d10002",
+  "name": "CinePersona",
+  "overview": "Record your watched movies with CinePersona",
+  "owner": "CinePersona",
+  "targetAbi": "10.10.0.0",
+  "timestamp": "2026-09-10T11:40:00.0000000Z",
+  "version": "0.1.18.0",
+  "status": "Active",
+  "autoUpdate": false,
+  "imagePath": "",
+  "assemblies": []
+}

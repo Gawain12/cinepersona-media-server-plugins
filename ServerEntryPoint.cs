@@ -115,7 +115,7 @@ namespace Emby.Plugin.CinePersona
             }
 
             var runtimeTicks = movie.RunTimeTicks ?? 0;
-            if (!HasReachedCompletion(runtimeTicks, positionTicks))
+            if (!rating.HasValue && !HasReachedCompletion(runtimeTicks, positionTicks))
             {
                 var progress = runtimeTicks > 0
                     ? (double)positionTicks / runtimeTicks
@@ -174,13 +174,20 @@ namespace Emby.Plugin.CinePersona
                 using (var timeout = new CancellationTokenSource(RequestTimeout))
                 using (var response = await HttpClient.SendAsync(request, timeout.Token).ConfigureAwait(false))
                 {
+                    var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    if ((int)response.StatusCode == 200
+                        && responseBody.IndexOf("\"status\":\"ignored\"", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        _logger.Info($"CinePersona 已忽略同步: {movie.Name}，触发方式：{trigger}");
+                        return;
+                    }
+
                     if (response.IsSuccessStatusCode)
                     {
                         _logger.Info($"CinePersona 同步成功: {movie.Name}，触发方式：{trigger} ({(int)response.StatusCode})");
                         return;
                     }
 
-                    var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     _logger.Warn($"CinePersona 同步失败: {(int)response.StatusCode} - {responseBody}");
                 }
             }

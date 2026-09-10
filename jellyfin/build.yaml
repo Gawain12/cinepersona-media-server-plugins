@@ -1,9 +1,9 @@
 ---
 name: "CinePersona"
 guid: "f62e8471-469b-43d8-b57f-f4a4d7d10002"
-version: "0.1.0.0"
-targetAbi: "10.11.0.0"
-framework: "net9.0"
+version: "0.1.18.0"
+targetAbi: "10.10.0.0"
+framework: "net8.0"
 overview: "Automatically sync completed Jellyfin movie plays to CinePersona."
 description: >
   Automatically records movies watched to at least 80 percent in CinePersona.
@@ -14,4 +14,5 @@ owner: "CinePersona"
 artifacts:
 - "Jellyfin.Plugin.CinePersona.dll"
 changelog: >
-  Initial release.
+  Sync movies when Jellyfin marks them as played manually or gives them a
+  personal rating, in addition to completed playback stops.
