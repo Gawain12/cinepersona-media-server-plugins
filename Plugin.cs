@@ -20,6 +20,7 @@ namespace Emby.Plugin.CinePersona
             : base(applicationPaths, xmlSerializer)
         {
             Instance = this;
+            InjectWebScript(applicationPaths);
         }
 
         public override string Name => "CinePersona";
@@ -48,8 +49,51 @@ namespace Emby.Plugin.CinePersona
                 {
                     Name = "CinePersonaConfigurationPageJS",
                     EmbeddedResourcePath = GetType().Namespace + ".Configuration.CinePersonaConfigurationPageJS.js"
+                },
+                new PluginPageInfo
+                {
+                    Name = "CinePersonaWeb",
+                    EmbeddedResourcePath = GetType().Namespace + ".Configuration.CinePersonaWeb.js"
                 }
             };
+        }
+
+        private static void InjectWebScript(IApplicationPaths applicationPaths)
+        {
+            try
+            {
+                var systemPath = applicationPaths?.ProgramSystemPath;
+                if (string.IsNullOrWhiteSpace(systemPath))
+                {
+                    return;
+                }
+
+                var indexPath = Path.Combine(systemPath, "dashboard-ui", "index.html");
+                if (!File.Exists(indexPath))
+                {
+                    return;
+                }
+
+                var contents = File.ReadAllText(indexPath);
+                const string marker = "data-cinepersona-web=\"true\"";
+                if (contents.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return;
+                }
+
+                const string script = "<script data-cinepersona-web=\"true\" src=\"/web/ConfigurationPage?name=CinePersonaWeb\"></script>";
+                var bodyIndex = contents.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+                contents = bodyIndex >= 0
+                    ? contents.Insert(bodyIndex, script)
+                    : contents + script;
+                File.WriteAllText(indexPath, contents);
+            }
+            catch
+            {
+                // A missing or read-only web directory must not prevent the
+                // server plugin from loading. The script will be retried on
+                // the next server restart.
+            }
         }
     }
 }

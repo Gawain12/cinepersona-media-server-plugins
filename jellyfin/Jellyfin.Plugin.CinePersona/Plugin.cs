@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using Jellyfin.Plugin.CinePersona.Configuration;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
@@ -13,6 +14,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
+        InjectWebScript(applicationPaths);
     }
 
     public static Plugin? Instance { get; private set; }
@@ -34,7 +36,52 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                     CultureInfo.InvariantCulture,
                     "{0}.Configuration.configPage.html",
                     GetType().Namespace)
+            },
+            new PluginPageInfo
+            {
+                Name = "CinePersonaWeb",
+                EmbeddedResourcePath = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0}.Configuration.CinePersonaWeb.js",
+                    GetType().Namespace)
             }
         };
+    }
+
+    private static void InjectWebScript(IApplicationPaths applicationPaths)
+    {
+        try
+        {
+            var webPath = applicationPaths?.WebPath;
+            if (string.IsNullOrWhiteSpace(webPath))
+            {
+                return;
+            }
+
+            var indexPath = Path.Combine(webPath, "index.html");
+            if (!File.Exists(indexPath))
+            {
+                return;
+            }
+
+            var contents = File.ReadAllText(indexPath);
+            const string marker = "data-cinepersona-web=\"true\"";
+            if (contents.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return;
+            }
+
+            const string script = "<script data-cinepersona-web=\"true\" src=\"/web/ConfigurationPage?name=CinePersonaWeb\"></script>";
+            var bodyIndex = contents.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+            contents = bodyIndex >= 0
+                ? contents.Insert(bodyIndex, script)
+                : contents + script;
+            File.WriteAllText(indexPath, contents);
+        }
+        catch
+        {
+            // A missing or read-only web directory must not prevent the
+            // server plugin from loading. Retry on the next server restart.
+        }
     }
 }
