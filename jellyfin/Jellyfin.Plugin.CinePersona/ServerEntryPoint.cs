@@ -33,7 +33,7 @@ public sealed class ServerEntryPoint : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        if (Plugin.Instance?.ApplicationPaths is { } applicationPaths)
+        if (Plugin.PluginPaths is { } applicationPaths)
         {
             Plugin.InjectWebScript(applicationPaths, _logger);
         }
