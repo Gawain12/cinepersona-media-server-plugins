@@ -42,6 +42,7 @@ jobs:
           mkdir -p dist
           cp bin/Release/netstandard2.0/Emby.Plugin.CinePersona.dll dist/
           cp jellyfin/Jellyfin.Plugin.CinePersona/bin/Release/net8.0/Jellyfin.Plugin.CinePersona.dll dist/
+          cp jellyfin/meta.json dist/jellyfin-meta.json
           cp plex/CinePersona.PlexRelay/cinepersona-plex-relay dist/
           cp jellyfin/build.yaml dist/jellyfin-build.yaml
           tar -czf dist/cinepersona-plex-relay-linux-amd64.tar.gz -C dist cinepersona-plex-relay
@@ -55,3 +56,4 @@ jobs:
             dist/Jellyfin.Plugin.CinePersona.dll
             dist/cinepersona-plex-relay-linux-amd64.tar.gz
             dist/jellyfin-build.yaml
+            dist/jellyfin-meta.json
