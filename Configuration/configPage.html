@@ -167,6 +167,7 @@
                 <div class="inputContainer">
                     <label class="inputLabel" for="txtApiKey">API Key</label>
                     <input is="emby-input" type="password" id="txtApiKey" name="txtApiKey" autocomplete="off" placeholder="cpk_..." required />
+                    <div class="fieldDescription">已配置的 Key 不会回显；需要更换时直接输入新的 Key。</div>
                 </div>
 
                 <div class="inputContainer">
@@ -231,10 +232,7 @@
                         config.ApiKey = apiKeyInput.value;
                         config.ServerUrl = serverUrlInput.value;
                         return ApiClient.updatePluginConfiguration(CinePersonaConfig.pluginUniqueId, config);
-                    }).then(function (result) {
-                        if (window.Dashboard && Dashboard.processPluginConfigurationUpdateResult) {
-                            Dashboard.processPluginConfigurationUpdateResult(result);
-                        }
+                    }).then(function () {
                         CinePersonaConfig.setStatus('已保存，插件会使用新配置。', 'success');
                     }).catch(function (error) {
                         console.error('CinePersona 配置保存失败', error);
