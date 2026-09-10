@@ -33,9 +33,9 @@ public sealed class ServerEntryPoint : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        if (Plugin.ApplicationPaths is not null)
+        if (Plugin.Instance?.ApplicationPaths is { } applicationPaths)
         {
-            Plugin.InjectWebScript(Plugin.ApplicationPaths, _logger);
+            Plugin.InjectWebScript(applicationPaths, _logger);
         }
         _sessionManager.PlaybackStopped += OnPlaybackStopped;
         _userDataManager.UserDataSaved += OnUserDataSaved;
