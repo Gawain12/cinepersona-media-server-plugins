@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Configuration/configPage.html" />
+    <EmbeddedResource Include="assets/emby-catalog-thumb.png" />
     <Compile Remove="jellyfin/**/*.cs" />
   </ItemGroup>
 </Project>

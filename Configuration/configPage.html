@@ -4,18 +4,18 @@
     <title>CinePersona</title>
     <style>
         .cinepersonaConfigurationPage .content-primary {
-            max-width: 760px;
+            max-width: 680px;
         }
 
         .cinepersonaHero {
             display: grid;
-            grid-template-columns: 92px minmax(0, 1fr);
-            gap: 20px;
+            grid-template-columns: 56px minmax(0, 1fr);
+            gap: 16px;
             align-items: center;
-            margin: 12px 0 28px;
-            padding: 24px;
+            margin: 8px 0 24px;
+            padding: 18px 20px;
             border: 1px solid rgba(67, 175, 255, 0.28);
-            border-radius: 18px;
+            border-radius: 14px;
             background:
                 radial-gradient(circle at 12% 10%, rgba(0, 174, 255, 0.22), transparent 42%),
                 linear-gradient(135deg, #0b1220 0%, #101d35 55%, #0a0e18 100%);
@@ -24,9 +24,9 @@
 
         .cinepersonaHeroMark {
             display: block;
-            width: 92px;
-            height: 92px;
-            border-radius: 22px;
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
             box-shadow: 0 0 28px rgba(23, 174, 255, 0.26);
         }
 
@@ -42,23 +42,14 @@
         .cinepersonaHeroTitle {
             margin: 0;
             color: #f4f8ff;
-            font-size: clamp(1.3em, 3vw, 1.8em);
+            font-size: clamp(1.18em, 3vw, 1.45em);
             line-height: 1.22;
         }
 
         .cinepersonaHeroCopy {
-            margin: 9px 0 0;
+            margin: 6px 0 0;
             color: rgba(231, 241, 255, 0.78);
-            line-height: 1.6;
-        }
-
-        .cinepersonaHeroMeta {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px 16px;
-            margin-top: 14px;
-            color: rgba(231, 241, 255, 0.58);
-            font-size: 0.82em;
+            line-height: 1.45;
         }
 
         .cinepersonaSectionTitle {
@@ -73,23 +64,41 @@
             color: #72c9ff;
         }
 
+        .cinepersonaSaveStatus {
+            min-height: 1.5em;
+            margin-top: 12px;
+            line-height: 1.45;
+        }
+
+        .cinepersonaSaveStatus[data-state="saving"] {
+            color: rgba(231, 241, 255, 0.7);
+        }
+
+        .cinepersonaSaveStatus[data-state="success"] {
+            color: #71d69a;
+        }
+
+        .cinepersonaSaveStatus[data-state="error"] {
+            color: #ff9d9d;
+        }
+
         @media (max-width: 560px) {
             .cinepersonaHero {
-                grid-template-columns: 64px minmax(0, 1fr);
-                gap: 14px;
-                padding: 18px;
+                grid-template-columns: 48px minmax(0, 1fr);
+                gap: 12px;
+                padding: 16px;
             }
 
             .cinepersonaHeroMark {
-                width: 64px;
-                height: 64px;
-                border-radius: 16px;
+                width: 48px;
+                height: 48px;
+                border-radius: 12px;
             }
         }
     </style>
 </head>
 <body>
-    <div data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button">
+    <div data-role="page" class="page type-interior pluginConfigurationPage cinepersonaConfigurationPage" data-require="emby-input,emby-button">
         <div class="content-primary">
             <section class="cinepersonaHero" aria-labelledby="cinepersonaHeroTitle">
                 <a href="https://cinepersona.com" target="_blank" rel="noopener noreferrer">
@@ -97,39 +106,43 @@
                 </a>
                 <div>
                     <p class="cinepersonaHeroEyebrow">Media watch sync</p>
-                    <h2 id="cinepersonaHeroTitle" class="cinepersonaHeroTitle">把看过的电影，留在你的 CinePersona</h2>
-                    <p class="cinepersonaHeroCopy">Emby 电影播放达到 80% 后，自动记录到你的观影档案。</p>
-                    <div class="cinepersonaHeroMeta">
-                        <span>80%+ 完成度</span>
-                        <span>TMDB / IMDb</span>
-                        <span>Movie only</span>
-                    </div>
+                    <h2 id="cinepersonaHeroTitle" class="cinepersonaHeroTitle">把看过的电影，留在 CinePersona</h2>
+                    <p class="cinepersonaHeroCopy">播放达到 80%，看过状态和星级评分自动同步。</p>
                 </div>
             </section>
 
             <form class="cinepersonaConfigurationForm" onsubmit="return CinePersonaConfig.submit(event);">
                 <h2 class="cinepersonaSectionTitle">连接设置</h2>
-                <p class="cinepersonaSectionCopy">请填写 CinePersona 地址和具有 <code>sync.write</code> 权限的 API Key。</p>
+                <p class="cinepersonaSectionCopy">填写 CinePersona 地址和 API Key。</p>
 
                 <div class="inputContainer">
-                    <label class="inputLabel" for="txtApiKey">API Key:</label>
-                    <input is="emby-input" type="password" id="txtApiKey" name="txtApiKey" autocomplete="off" required />
-                    <div class="fieldDescription">格式示例：cpk_xxxxxxxx_yyyyyyyy</div>
+                    <label class="inputLabel" for="txtApiKey">API Key</label>
+                    <input is="emby-input" type="password" id="txtApiKey" name="txtApiKey" autocomplete="off" placeholder="cpk_..." required />
                 </div>
 
                 <div class="inputContainer">
-                    <label class="inputLabel" for="txtServerUrl">CinePersona 地址:</label>
+                    <label class="inputLabel" for="txtServerUrl">CinePersona 地址</label>
                     <input is="emby-input" type="url" id="txtServerUrl" name="txtServerUrl" value="https://cinepersona.com" required />
                     <div class="fieldDescription">正式环境：<span class="cinepersonaHint">https://cinepersona.com</span>　测试环境：https://test.gawyn.de</div>
                 </div>
 
-                <button is="emby-button" type="submit" class="raised button-submit block">保存</button>
+                <button is="emby-button" type="submit" class="raised button-submit block" id="btnSave">保存设置</button>
+                <div id="cinepersonaSaveStatus" class="cinepersonaSaveStatus" role="status" aria-live="polite"></div>
             </form>
         </div>
 
         <script type="text/javascript">
             var CinePersonaConfig = {
                 pluginUniqueId: "f62e8471-469b-43d8-b57f-f4a4d7d10001",
+
+                setStatus: function (message, state) {
+                    var status = document.getElementById('cinepersonaSaveStatus');
+                    if (!status) {
+                        return;
+                    }
+                    status.textContent = message || '';
+                    status.dataset.state = state || '';
+                },
 
                 load: function () {
                     var apiKeyInput = document.getElementById('txtApiKey');
@@ -138,9 +151,12 @@
                         return;
                     }
 
-                    ApiClient.getPluginConfiguration(CinePersonaConfig.pluginUniqueId).then(function (config) {
+                    return ApiClient.getPluginConfiguration(CinePersonaConfig.pluginUniqueId).then(function (config) {
                         apiKeyInput.value = config.ApiKey || '';
                         serverUrlInput.value = config.ServerUrl || 'https://cinepersona.com';
+                    }).catch(function (error) {
+                        console.error('CinePersona 配置读取失败', error);
+                        CinePersonaConfig.setStatus('读取配置失败，请刷新后重试。', 'error');
                     });
                 },
 
@@ -156,12 +172,28 @@
                         return false;
                     }
 
+                    var saveButton = document.getElementById('btnSave');
+                    if (saveButton) {
+                        saveButton.disabled = true;
+                    }
+                    CinePersonaConfig.setStatus('正在保存…', 'saving');
+
                     ApiClient.getPluginConfiguration(CinePersonaConfig.pluginUniqueId).then(function (config) {
                         config.ApiKey = apiKeyInput.value;
                         config.ServerUrl = serverUrlInput.value;
                         return ApiClient.updatePluginConfiguration(CinePersonaConfig.pluginUniqueId, config);
                     }).then(function (result) {
-                        Dashboard.processPluginConfigurationUpdateResult(result);
+                        if (window.Dashboard && Dashboard.processPluginConfigurationUpdateResult) {
+                            Dashboard.processPluginConfigurationUpdateResult(result);
+                        }
+                        CinePersonaConfig.setStatus('已保存，插件会使用新配置。', 'success');
+                    }).catch(function (error) {
+                        console.error('CinePersona 配置保存失败', error);
+                        CinePersonaConfig.setStatus('保存失败，请检查地址和 API Key 后重试。', 'error');
+                    }).then(function () {
+                        if (saveButton) {
+                            saveButton.disabled = false;
+                        }
                     });
 
                     return false;
