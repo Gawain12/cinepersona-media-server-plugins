@@ -9,10 +9,10 @@
         }
     } catch (e) {}
 
-    if (window.__cinePersonaWebVersion === "0.2.0") {
+    if (window.__cinePersonaWebVersion === "0.2.1") {
         return;
     }
-    window.__cinePersonaWebVersion = "0.2.0";
+    window.__cinePersonaWebVersion = "0.2.1";
     window.__cinePersonaWebLoaded = true;
 
     var state = {
@@ -115,6 +115,42 @@
         return "";
     }
 
+    function validRating(value) {
+        var rating = Number(value);
+        return isFinite(rating) && rating >= 0.5 && rating <= 10 ? rating : 0;
+    }
+
+    function ratingStorageKey(itemId) {
+        return "cinepersona:rating:" + String(window.location.host || "emby") + ":" + String(itemId || "");
+    }
+
+    function readStoredRating(itemId) {
+        try {
+            return validRating(window.localStorage.getItem(ratingStorageKey(itemId)));
+        } catch (ignore) {
+            return 0;
+        }
+    }
+
+    function storeRating(itemId, rating) {
+        try {
+            window.localStorage.setItem(ratingStorageKey(itemId), String(rating));
+        } catch (ignore) {}
+    }
+
+    function itemRating(item) {
+        var nativeRating = item && item.UserData ? validRating(item.UserData.Rating) : 0;
+        return nativeRating || readStoredRating(item && item.Id);
+    }
+
+    function formatRating(rating) {
+        var value = validRating(rating);
+        if (!value) {
+            return "评分";
+        }
+        return (Math.round(value * 10) / 10).toString() + "/10";
+    }
+
     function ensureStyles() {
         if (document.getElementById("cinepersona-web-style")) {
             return;
@@ -123,20 +159,17 @@
         style.id = "cinepersona-web-style";
         style.textContent = "" +
             "/* Emby 内嵌操作栏按钮 */" +
-            ".cinepersona-detail-button{display:inline-flex;align-items:center;justify-content:center;margin:0 .5em .5em 0;cursor:pointer;vertical-align:middle;text-decoration:none;border-radius:1000px;padding:.62em 1.2em;border:1px solid rgba(49,92,154,.45);background:rgba(49,92,154,.08);color:#315c9a;font-weight:600;font-size:.92em;transition:all .18s ease;outline:none;box-sizing:border-box}" +
-            ".cinepersona-detail-button:hover{background:rgba(49,92,154,.18);border-color:#315c9a;transform:translateY(-1px)}" +
-            ".cinepersona-detail-button .cinepersona-btn-icon{margin-right:6px;font-size:1.15em;line-height:1;display:inline-block}" +
-            "/* 评分/元信息栏内嵌徽章（位于左上介绍分数旁边/下方） */" +
-            ".cinepersona-rating-badge{display:inline-flex;align-items:center;margin-left:8px;padding:3px 10px;border-radius:12px;background:rgba(49,92,154,.12);border:1px solid rgba(49,92,154,.35);color:#315c9a;font-size:.85em;font-weight:650;cursor:pointer;line-height:1.3;vertical-align:middle;transition:all .16s ease;text-decoration:none}" +
-            ".cinepersona-rating-badge:hover{background:rgba(49,92,154,.22);border-color:#315c9a;transform:scale(1.03)}" +
-            ".cinepersona-rating-badge .cinepersona-badge-icon{margin-right:4px;font-size:1.05em}" +
+            ".cinepersona-detail-button{display:inline-flex;align-items:center;align-self:center;justify-content:center;min-height:2.55em;margin:0 .55em .5em 0;cursor:pointer;vertical-align:middle;text-decoration:none;border:0;border-radius:.38em;padding:.52em .82em;background:rgba(255,255,255,.16);color:inherit;font-weight:600;font-size:.92em;line-height:1;transition:background .16s ease,color .16s ease;outline:none;box-sizing:border-box}" +
+            ".cinepersona-detail-button:hover{background:rgba(255,255,255,.28)}" +
+            ".cinepersona-detail-button.is-rated{background:rgba(73,121,182,.32);color:#d8e8ff}" +
+            ".cinepersona-detail-button .cinepersona-btn-icon{margin-right:5px;font-size:1em;line-height:1;display:inline-block}" +
             "/* 弹窗核心样式 */" +
             "#cinepersona-review-modal{position:fixed;inset:0;z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(10,18,30,.58);font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}" +
             ".cinepersona-review-card{width:min(430px,100%);max-height:calc(100vh - 40px);overflow:auto;border:1px solid rgba(255,255,255,.48);border-radius:18px;padding:25px;background:rgba(250,248,245,.97);color:#253142;box-shadow:0 24px 70px rgba(0,0,0,.34)}" +
             ".cinepersona-review-kicker{margin:0 0 7px;color:#315c9a;font-size:11px;font-weight:750;letter-spacing:.14em;text-transform:uppercase}.cinepersona-review-title{margin:0;font-size:22px;line-height:1.28}.cinepersona-review-copy{margin:8px 0 20px;color:#637083;font-size:13px;line-height:1.5}.cinepersona-review-stars{display:flex;justify-content:center;gap:1px;margin:4px 0 8px}.cinepersona-review-star{border:0;padding:2px;background:transparent;color:#aeb8c5;font-size:27px;line-height:1;cursor:pointer}.cinepersona-review-star.is-selected{color:#315c9a}.cinepersona-review-score{min-height:20px;margin:0 0 17px;text-align:center;color:#315c9a;font-size:13px;font-weight:650}.cinepersona-review-label{display:block;margin:0 0 7px;color:#536173;font-size:12px;font-weight:650}.cinepersona-review-text{display:block;width:100%;min-height:104px;box-sizing:border-box;resize:vertical;border:1px solid #d3dae3;border-radius:10px;padding:11px 12px;background:#fff;color:#253142;font:14px/1.55 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;outline:none}.cinepersona-review-text:focus{border-color:#315c9a;box-shadow:0 0 0 3px rgba(49,92,154,.13)}.cinepersona-review-note{margin:8px 0 0;color:#7b8797;font-size:12px;line-height:1.4}.cinepersona-review-status{min-height:19px;margin:15px 0 0;color:#b42318;font-size:13px;line-height:1.4}.cinepersona-review-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:17px}.cinepersona-review-action{min-width:88px;border:1px solid #315c9a;border-radius:9px;padding:10px 15px;background:transparent;color:#315c9a;font:650 14px system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer}.cinepersona-review-action.primary{background:#315c9a;color:#fff}.cinepersona-review-action:disabled{opacity:.55;cursor:wait}" +
             "/* 暗色模式适配 */" +
-            "@media (prefers-color-scheme:dark){.cinepersona-detail-button{background:rgba(85,126,175,.15);border-color:rgba(142,178,228,.4);color:#bcd4f2}.cinepersona-detail-button:hover{background:rgba(85,126,175,.28);border-color:#8eb2e4}.cinepersona-rating-badge{background:rgba(85,126,175,.18);border-color:rgba(142,178,228,.4);color:#bcd4f2}.cinepersona-rating-badge:hover{background:rgba(85,126,175,.32);border-color:#8eb2e4}.cinepersona-review-card{background:rgba(30,37,48,.98);color:#edf2f8}.cinepersona-review-copy,.cinepersona-review-note,.cinepersona-review-label{color:#aab5c4}.cinepersona-review-text{border-color:#465363;background:#232c38;color:#edf2f8}.cinepersona-review-star{color:#667386}.cinepersona-review-star.is-selected,.cinepersona-review-kicker,.cinepersona-review-score{color:#a9c7f2}.cinepersona-review-action{border-color:#8eb2e4;color:#bcd4f2}.cinepersona-review-action.primary{background:#4779b6;color:#fff}}" +
-            "@media (max-width:560px){.cinepersona-review-card{padding:21px;border-radius:15px}.cinepersona-review-stars{gap:0}.cinepersona-review-star{font-size:24px}}";
+            "@media (prefers-color-scheme:dark){.cinepersona-detail-button{background:rgba(255,255,255,.14);color:#edf2f8}.cinepersona-detail-button:hover{background:rgba(255,255,255,.25)}.cinepersona-detail-button.is-rated{background:rgba(73,121,182,.46);color:#e5f0ff}.cinepersona-review-card{background:rgba(30,37,48,.98);color:#edf2f8}.cinepersona-review-copy,.cinepersona-review-note,.cinepersona-review-label{color:#aab5c4}.cinepersona-review-text{border-color:#465363;background:#232c38;color:#edf2f8}.cinepersona-review-star{color:#667386}.cinepersona-review-star.is-selected,.cinepersona-review-kicker,.cinepersona-review-score{color:#a9c7f2}.cinepersona-review-action{border-color:#8eb2e4;color:#bcd4f2}.cinepersona-review-action.primary{background:#4779b6;color:#fff}}" +
+            "@media (max-width:560px){.cinepersona-detail-button{padding:.5em .7em;font-size:.88em}.cinepersona-review-card{padding:21px;border-radius:15px}.cinepersona-review-stars{gap:0}.cinepersona-review-star{font-size:24px}}";
         document.head.appendChild(style);
     }
 
@@ -168,8 +201,11 @@
             var btn = document.createElement("button");
             btn.type = "button";
             btn.className = "cinepersona-detail-button cinepersona-injected-trigger";
-            btn.title = "在 CinePersona 影格评分并写短评";
-            btn.innerHTML = '<span class="cinepersona-btn-icon">🎬</span><span>影格评价</span>';
+            var rating = itemRating(state.item);
+            btn.className += rating ? " is-rated" : "";
+            btn.title = rating ? "修改 CinePersona 评分（" + formatRating(rating) + "）" : "在 CinePersona 评分并写短评";
+            btn.setAttribute("aria-label", btn.title);
+            btn.innerHTML = '<span class="cinepersona-btn-icon">★</span><span>' + formatRating(rating) + '</span>';
             btn.addEventListener("click", openModal);
 
             // 插入在合适的位置（例如如果是评分按钮之前或直接加在主按钮最后）
@@ -179,22 +215,6 @@
             } else {
                 btnBar.appendChild(btn);
             }
-            injectedCount++;
-        }
-
-        // 2. 注入到评分 / 元信息栏 (.mediaInfoPrimary / .mediaInfoSecondary)
-        var mediaInfo = document.querySelector(".mediaInfoPrimary") || document.querySelector(".detail-mediaInfoPrimary") || document.querySelector(".mediaInfoSecondary");
-        if (mediaInfo && !mediaInfo.querySelector(".cinepersona-rating-badge")) {
-            var badge = document.createElement("a");
-            badge.href = "javascript:void(0);";
-            badge.className = "cinepersona-rating-badge cinepersona-injected-trigger";
-            badge.title = "在 CinePersona 影格打分与写短评";
-            badge.innerHTML = '<span class="cinepersona-badge-icon">✍️</span><span>影格打分</span>';
-            badge.addEventListener("click", function (e) {
-                e.preventDefault();
-                openModal();
-            });
-            mediaInfo.appendChild(badge);
             injectedCount++;
         }
 
@@ -271,7 +291,7 @@
             return;
         }
         closeModal();
-        state.rating = Number(state.item.UserData && state.item.UserData.Rating) || 0;
+        state.rating = itemRating(state.item);
 
         var modal = makeElement("div");
         modal.id = "cinepersona-review-modal";
@@ -317,7 +337,12 @@
                 if (state.item.UserData) {
                     state.item.UserData.Rating = state.rating;
                     state.item.UserData.Played = true;
+                } else {
+                    state.item.UserData = { Rating: state.rating, Played: true };
                 }
+                storeRating(state.item.Id, state.rating);
+                removeTriggers();
+                injectTriggers();
                 status.style.color = "#238653";
                 status.textContent = "已保存到 Emby 和 CinePersona。";
                 window.setTimeout(closeModal, 650);

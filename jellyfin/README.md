@@ -2,7 +2,7 @@
 
 Jellyfin 原生服务端插件：电影播放完成度达到 80%、手动标记为看过或提交个人星级评价后，自动将观影记录同步到 CinePersona。
 
-Jellyfin Web 电影详情页还会注入一个“评价”弹窗：评分写回 Jellyfin，并把评分和短评同步到 CinePersona。短评不会写入 Jellyfin 原生评论字段，也不会把 API Key 暴露给浏览器。
+Jellyfin Web 电影详情页还会注入一个“评分”入口：可提交评分和短评，已有评分会回显在按钮上。短评不会写入 Jellyfin 原生评论字段，也不会把 API Key 暴露给浏览器。
 
 当前仅同步 `Movie`。电视剧、季度、单集、音乐、书籍和其他类型会被跳过，不会被强制当作电影提交。
 
@@ -16,6 +16,6 @@ dotnet build Jellyfin.Plugin.CinePersona/Jellyfin.Plugin.CinePersona.csproj -c R
 
 ## 安装
 
-将生成的 DLL 放入 Jellyfin 的插件目录下以插件名命名的子目录，重启 Jellyfin，然后在插件设置中填写 CinePersona API Key 和服务器地址。重启后打开 Jellyfin Web 的电影详情页并硬刷新一次，右下角会出现“评价”按钮；手机、电视等原生客户端暂不注入此按钮。
+将生成的 DLL 放入 Jellyfin 的插件目录下以插件名命名的子目录，重启 Jellyfin，然后在插件设置中填写 CinePersona API Key 和服务器地址。重启后打开 Jellyfin Web 的电影详情页并硬刷新一次，操作栏会出现“评分”按钮，已有评分显示为 `7/10` 形式；手机、电视等原生客户端暂不注入此按钮。
 
 API Key 只需要 `sync.write` 权限。
