@@ -156,7 +156,7 @@ public sealed class ServerEntryPoint : IHostedService
             }
 
             var isInitialSync = !profile.InitialSyncCompleted;
-            var now = DateTime.UtcNow;
+            now = DateTime.UtcNow;
             if (!isInitialSync
                 && profile.LastSyncAt.HasValue
                 && now - profile.LastSyncAt.Value.ToUniversalTime() < ReverseSyncInterval)
