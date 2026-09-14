@@ -241,9 +241,41 @@
             ".cinepersona-review-spoiler{display:flex;align-items:center;gap:8px;margin:12px 0 0;color:#536173;font-size:13px;line-height:1.4;cursor:pointer}.cinepersona-review-spoiler input{width:16px;height:16px;margin:0;accent-color:#315c9a}" +
             "/* 暗色模式适配 */" +
             "@media (prefers-color-scheme:dark){.cinepersona-detail-button{background:rgba(255,255,255,.14);color:#edf2f8}.cinepersona-detail-button:hover{background:rgba(255,255,255,.25)}.cinepersona-detail-button.is-rated{background:rgba(73,121,182,.46);color:#e5f0ff}.cinepersona-review-card{background:rgba(30,37,48,.98);color:#edf2f8}.cinepersona-review-copy,.cinepersona-review-note,.cinepersona-review-label,.cinepersona-review-spoiler{color:#aab5c4}.cinepersona-review-text{border-color:#465363;background:#232c38;color:#edf2f8}.cinepersona-review-star{color:#667386}.cinepersona-review-star.is-selected,.cinepersona-review-kicker,.cinepersona-review-score{color:#a9c7f2}.cinepersona-review-action{border-color:#8eb2e4;color:#bcd4f2}.cinepersona-review-action.primary{background:#4779b6;color:#fff}}" +
+            ".cinepersona-review-card.theme-dark{background:rgba(30,37,48,.98)!important;color:#edf2f8!important}" +
+            ".cinepersona-review-card.theme-dark .cinepersona-review-copy,.cinepersona-review-card.theme-dark .cinepersona-review-note,.cinepersona-review-card.theme-dark .cinepersona-review-label,.cinepersona-review-card.theme-dark .cinepersona-review-spoiler{color:#aab5c4!important}" +
+            ".cinepersona-review-card.theme-dark .cinepersona-review-text{border-color:#465363!important;background:#232c38!important;color:#edf2f8!important}" +
+            ".cinepersona-review-card.theme-dark .cinepersona-review-star{color:#667386!important}" +
+            ".cinepersona-review-card.theme-dark .cinepersona-review-star.is-selected,.cinepersona-review-card.theme-dark .cinepersona-review-kicker,.cinepersona-review-card.theme-dark .cinepersona-review-score{color:#a9c7f2!important}" +
+            ".cinepersona-review-card.theme-dark .cinepersona-review-action{border-color:#8eb2e4!important;color:#bcd4f2!important}" +
+            ".cinepersona-review-card.theme-dark .cinepersona-review-action.primary{background:#4779b6!important;color:#fff!important}" +
             "@media (max-width:560px){.cinepersona-detail-button{padding:.5em .7em;font-size:.88em}.cinepersona-review-card{padding:16px;border-radius:13px}.cinepersona-review-stars{gap:0}.cinepersona-review-star{font-size:23px}}" +
             ".cinepersona-detail-button{height:2.6em;min-height:2.6em;padding:0 .95em;font-size:1em;font-weight:600;line-height:1}.cinepersona-detail-button .cinepersona-btn-icon,.cinepersona-detail-button .cinepersona-btn-label{display:inline-flex;align-items:center;justify-content:center;height:1em;line-height:1;vertical-align:middle}.cinepersona-detail-button .cinepersona-btn-icon{width:1em;margin-right:.45em}.cinepersona-review-actions{align-items:center;flex-wrap:wrap}.cinepersona-review-action{font:650 14px/1.1 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.cinepersona-review-action-link{min-width:0;margin-right:auto;border-color:transparent;padding-left:0;padding-right:0;text-decoration:none;white-space:nowrap}.cinepersona-external-link{color:inherit;text-decoration:none}";
         document.head.appendChild(style);
+    }
+
+    function isDarkTheme() {
+        if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            return true;
+        }
+        var bodyClass = String(document.body ? document.body.className : "") + " " + String(document.documentElement ? document.documentElement.className : "");
+        if (/dark|black|wistful|night/i.test(bodyClass)) {
+            return true;
+        }
+        var themeAttr = (document.body && document.body.getAttribute("data-theme")) || (document.documentElement && document.documentElement.getAttribute("data-theme")) || "";
+        if (/dark|black|wistful|night/i.test(themeAttr)) {
+            return true;
+        }
+        try {
+            var bg = window.getComputedStyle(document.body).backgroundColor;
+            var match = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+            if (match) {
+                var lum = 0.299 * (+match[1]) + 0.587 * (+match[2]) + 0.114 * (+match[3]);
+                if (lum < 130) {
+                    return true;
+                }
+            }
+        } catch (e) {}
+        return false;
     }
 
     function makeElement(tag, className, text) {
@@ -468,7 +500,7 @@
         modal.setAttribute("role", "dialog");
         modal.setAttribute("aria-modal", "true");
 
-        var card = makeElement("div", "cinepersona-review-card");
+        var card = makeElement("div", "cinepersona-review-card" + (isDarkTheme() ? " theme-dark" : ""));
         var title = makeElement("h2", "cinepersona-review-title", "连接 CinePersona");
         var copy = makeElement("p", "cinepersona-review-copy", "当前 Jellyfin 用户单独保存自己的观影记录和评分。");
         var label = makeElement("label", "cinepersona-review-label", "API Key");
@@ -567,7 +599,7 @@
         modal.id = "cinepersona-review-modal";
         modal.setAttribute("role", "dialog");
         modal.setAttribute("aria-modal", "true");
-        var card = makeElement("div", "cinepersona-review-card");
+        var card = makeElement("div", "cinepersona-review-card" + (isDarkTheme() ? " theme-dark" : ""));
         var title = makeElement("h2", "cinepersona-review-title", state.item.Name || "评价这部电影");
         var stars = makeElement("div", "cinepersona-review-stars");
         var score = makeElement("p", "cinepersona-review-score");

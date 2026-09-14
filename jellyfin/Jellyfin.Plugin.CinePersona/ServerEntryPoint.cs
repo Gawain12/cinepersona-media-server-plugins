@@ -113,6 +113,32 @@ public sealed class ServerEntryPoint : IHostedService
             return;
         }
 
+        var profiles = configuration.GetConfiguredUserProfiles();
+        var now = DateTime.UtcNow;
+        var hasPendingSync = false;
+        foreach (var profile in profiles)
+        {
+            var apiKey = profile.ApiKey.Trim();
+            if (!profile.Enabled || apiKey.Length == 0 || !Guid.TryParse(profile.UserId, out _))
+            {
+                continue;
+            }
+
+            var isInitialSync = !profile.InitialSyncCompleted;
+            if (isInitialSync
+                || !profile.LastSyncAt.HasValue
+                || now - profile.LastSyncAt.Value.ToUniversalTime() >= ReverseSyncInterval)
+            {
+                hasPendingSync = true;
+                break;
+            }
+        }
+
+        if (!hasPendingSync)
+        {
+            return;
+        }
+
         var movies = _libraryManager.GetItemList(new InternalItemsQuery
         {
             IncludeItemTypes = new[] { BaseItemKind.Movie },
@@ -121,7 +147,7 @@ public sealed class ServerEntryPoint : IHostedService
         });
         var movieIndex = BuildMovieIndex(movies);
         var changed = false;
-        foreach (var profile in configuration.GetConfiguredUserProfiles())
+        foreach (var profile in profiles)
         {
             var apiKey = profile.ApiKey.Trim();
             if (!profile.Enabled || apiKey.Length == 0 || !Guid.TryParse(profile.UserId, out var userId))

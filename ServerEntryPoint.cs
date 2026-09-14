@@ -147,6 +147,32 @@ namespace Emby.Plugin.CinePersona
                 return;
             }
 
+            var profiles = configuration.GetConfiguredUserProfiles();
+            var now = DateTime.UtcNow;
+            var hasPendingSync = false;
+            foreach (var profile in profiles)
+            {
+                var apiKey = (profile.ApiKey ?? string.Empty).Trim();
+                if (!profile.Enabled || apiKey.Length == 0 || !Guid.TryParse(profile.UserId, out _))
+                {
+                    continue;
+                }
+
+                var isInitialSync = !profile.InitialSyncCompleted;
+                if (isInitialSync
+                    || !profile.LastSyncAt.HasValue
+                    || now - profile.LastSyncAt.Value.ToUniversalTime() >= ReverseSyncInterval)
+                {
+                    hasPendingSync = true;
+                    break;
+                }
+            }
+
+            if (!hasPendingSync)
+            {
+                return;
+            }
+
             var movies = _libraryManager.GetItemList(new InternalItemsQuery
             {
                 IncludeItemTypes = new[] { "Movie" },
@@ -155,7 +181,7 @@ namespace Emby.Plugin.CinePersona
             });
             var movieIndex = BuildMovieIndex(movies);
             var changed = false;
-            foreach (var profile in configuration.GetConfiguredUserProfiles())
+            foreach (var profile in profiles)
             {
                 var apiKey = (profile.ApiKey ?? string.Empty).Trim();
                 if (!profile.Enabled || apiKey.Length == 0 || !Guid.TryParse(profile.UserId, out var userId))
