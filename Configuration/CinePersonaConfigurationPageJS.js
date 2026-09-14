@@ -2,9 +2,7 @@ define([], function () {
     return function (page) {
         var pluginUniqueId = "f62e8471-469b-43d8-b57f-f4a4d7d10001";
         var form;
-        var apiKeyInput;
         var serverUrlInput;
-        var syncUserIdInput;
         var reverseSyncInput;
         var saveButton;
         var status;
@@ -16,14 +14,12 @@ define([], function () {
             }
 
             form = page.querySelector("#cinepersonaConfigurationForm");
-            apiKeyInput = page.querySelector("#txtApiKey");
             serverUrlInput = page.querySelector("#txtServerUrl");
-            syncUserIdInput = page.querySelector("#txtSyncUserId");
             reverseSyncInput = page.querySelector("#chkReverseSync");
             saveButton = page.querySelector("#btnSave");
             status = page.querySelector("#cinepersonaSaveStatus");
 
-            if (!form || !apiKeyInput || !serverUrlInput) {
+            if (!form || !serverUrlInput) {
                 return;
             }
 
@@ -42,16 +38,12 @@ define([], function () {
         }
 
         function load() {
-            if (!apiKeyInput || !serverUrlInput) {
+            if (!serverUrlInput) {
                 return;
             }
 
             ApiClient.getPluginConfiguration(pluginUniqueId).then(function (config) {
-                apiKeyInput.value = "";
                 serverUrlInput.value = config.ServerUrl || "https://cinepersona.com";
-                if (syncUserIdInput) {
-                    syncUserIdInput.value = config.SyncUserId || (ApiClient.getCurrentUserId ? ApiClient.getCurrentUserId() : "");
-                }
                 if (reverseSyncInput) {
                     reverseSyncInput.checked = config.ReverseSyncEnabled !== false;
                 }
@@ -67,7 +59,7 @@ define([], function () {
                 event.stopPropagation();
             }
 
-            if (!apiKeyInput || !serverUrlInput) {
+            if (!serverUrlInput) {
                 return false;
             }
 
@@ -77,17 +69,7 @@ define([], function () {
             setStatus("正在保存…", "saving");
 
             ApiClient.getPluginConfiguration(pluginUniqueId).then(function (config) {
-                var enteredApiKey = apiKeyInput.value.trim();
-                if (enteredApiKey) {
-                    config.ApiKey = enteredApiKey;
-                }
-                if (!config.ApiKey) {
-                    throw new Error("API Key 不能为空");
-                }
                 config.ServerUrl = serverUrlInput.value;
-                if (syncUserIdInput) {
-                    config.SyncUserId = syncUserIdInput.value.trim();
-                }
                 if (reverseSyncInput) {
                     config.ReverseSyncEnabled = reverseSyncInput.checked;
                 }
@@ -96,9 +78,7 @@ define([], function () {
                 setStatus("已保存，插件会使用新配置。", "success");
             }).catch(function (error) {
                 console.error("CinePersona 配置保存失败", error);
-                setStatus(error && error.message === "API Key 不能为空"
-                    ? "请输入 API Key 后再保存。"
-                    : "保存失败，请检查地址和 API Key 后重试。", "error");
+                setStatus("保存失败，请检查 CinePersona 地址后重试。", "error");
             }).then(function () {
                 if (saveButton) {
                     saveButton.disabled = false;

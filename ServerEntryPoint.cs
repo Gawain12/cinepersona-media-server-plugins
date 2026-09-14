@@ -66,7 +66,7 @@ namespace Emby.Plugin.CinePersona
         {
             try
             {
-                await SyncPlaybackAsync(e).ConfigureAwait(false);
+                await SyncPlaybackAsync(e, e?.Session?.UserId.ToString()).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -92,13 +92,13 @@ namespace Emby.Plugin.CinePersona
                     var positionTicks = runtimeTicks > 0
                         ? runtimeTicks
                         : e.UserData.PlaybackPositionTicks;
-                    await SyncMovieAsync(movie, positionTicks, "手动标记看过", null).ConfigureAwait(false);
+                    await SyncMovieAsync(movie, positionTicks, "手动标记看过", null, e.UserId.ToString()).ConfigureAwait(false);
                     return;
                 }
 
                 if (e.SaveReason == UserDataSaveReason.UpdateUserRating && e.UserData.Rating.HasValue)
                 {
-                    await SyncMovieAsync(movie, runtimeTicks, "Emby 星级评价", e.UserData.Rating).ConfigureAwait(false);
+                    await SyncMovieAsync(movie, runtimeTicks, "Emby 星级评价", e.UserData.Rating, e.UserId.ToString()).ConfigureAwait(false);
                 }
             }
             catch (Exception ex)
@@ -107,14 +107,14 @@ namespace Emby.Plugin.CinePersona
             }
         }
 
-        private async Task SyncPlaybackAsync(PlaybackStopEventArgs e)
+        private async Task SyncPlaybackAsync(PlaybackStopEventArgs e, string userId)
         {
             if (!(e.Item is Movie movie))
             {
                 return;
             }
 
-            await SyncMovieAsync(movie, e.PlaybackPositionTicks ?? 0, "播放完成", null).ConfigureAwait(false);
+            await SyncMovieAsync(movie, e.PlaybackPositionTicks ?? 0, "播放完成", null, userId).ConfigureAwait(false);
         }
 
         private async Task RunReverseSyncSafelyAsync()
@@ -147,36 +147,6 @@ namespace Emby.Plugin.CinePersona
                 return;
             }
 
-            var apiKey = (configuration.ApiKey ?? string.Empty).Trim();
-            var syncUserId = (configuration.SyncUserId ?? string.Empty).Trim();
-            if (apiKey.Length == 0 || syncUserId.Length == 0)
-            {
-                return;
-            }
-
-            if (!Guid.TryParse(syncUserId, out var userId))
-            {
-                _logger.Warn("CinePersona 反向同步用户 ID 无效");
-                return;
-            }
-
-            var isInitialSync = !configuration.InitialSyncCompleted
-                || !string.Equals(configuration.LastSyncUserId, syncUserId, StringComparison.OrdinalIgnoreCase);
-            var now = DateTime.UtcNow;
-            if (!isInitialSync
-                && configuration.LastSyncAt.HasValue
-                && now - configuration.LastSyncAt.Value.ToUniversalTime() < ReverseSyncInterval)
-            {
-                return;
-            }
-
-            var user = _userManager.GetUserById(userId);
-            if (user == null)
-            {
-                _logger.Warn($"CinePersona 反向同步找不到 Emby 用户: {syncUserId}");
-                return;
-            }
-
             var movies = _libraryManager.GetItemList(new InternalItemsQuery
             {
                 IncludeItemTypes = new[] { "Movie" },
@@ -184,45 +154,75 @@ namespace Emby.Plugin.CinePersona
                 EnableTotalRecordCount = false
             });
             var movieIndex = BuildMovieIndex(movies);
-            DateTime? since = null;
-            if (!isInitialSync && configuration.LastSyncAt.HasValue)
+            var changed = false;
+            foreach (var profile in configuration.GetConfiguredUserProfiles())
             {
-                since = configuration.LastSyncAt.Value.ToUniversalTime().AddMinutes(-5);
-            }
-
-            var offset = 0;
-            var imported = 0;
-            var matched = 0;
-            for (var pageNumber = 0; pageNumber < 100; pageNumber++)
-            {
-                var page = await FetchSyncPageAsync(configuration, apiKey, since, offset).ConfigureAwait(false);
-                var activities = page.Activities ?? new SyncActivity[0];
-                foreach (var activity in activities)
+                var apiKey = (profile.ApiKey ?? string.Empty).Trim();
+                if (!profile.Enabled || apiKey.Length == 0 || !Guid.TryParse(profile.UserId, out var userId))
                 {
-                    imported++;
-                    if (ApplySyncActivity(user, activity, movieIndex))
+                    continue;
+                }
+
+                var isInitialSync = !profile.InitialSyncCompleted;
+                var now = DateTime.UtcNow;
+                if (!isInitialSync
+                    && profile.LastSyncAt.HasValue
+                    && now - profile.LastSyncAt.Value.ToUniversalTime() < ReverseSyncInterval)
+                {
+                    continue;
+                }
+
+                var user = _userManager.GetUserById(userId);
+                if (user == null)
+                {
+                    _logger.Warn($"CinePersona 反向同步找不到 Emby 用户: {profile.UserId}");
+                    continue;
+                }
+
+                DateTime? since = null;
+                if (!isInitialSync && profile.LastSyncAt.HasValue)
+                {
+                    since = profile.LastSyncAt.Value.ToUniversalTime().AddMinutes(-5);
+                }
+
+                var offset = 0;
+                var imported = 0;
+                var matched = 0;
+                for (var pageNumber = 0; pageNumber < 100; pageNumber++)
+                {
+                    var page = await FetchSyncPageAsync(configuration, apiKey, since, offset).ConfigureAwait(false);
+                    var activities = page.Activities ?? new SyncActivity[0];
+                    foreach (var activity in activities)
                     {
-                        matched++;
+                        imported++;
+                        if (ApplySyncActivity(user, activity, movieIndex))
+                        {
+                            matched++;
+                        }
+                    }
+
+                    if (page.Paging == null || !page.Paging.HasMore || activities.Length == 0)
+                    {
+                        break;
+                    }
+
+                    offset += activities.Length;
+                    if (pageNumber == 99)
+                    {
+                        throw new InvalidOperationException("CinePersona 反向同步超过 100 页，已中止");
                     }
                 }
 
-                if (page.Paging == null || !page.Paging.HasMore || activities.Length == 0)
-                {
-                    break;
-                }
-
-                offset += activities.Length;
-                if (pageNumber == 99)
-                {
-                    throw new InvalidOperationException("CinePersona 反向同步超过 100 页，已中止");
-                }
+                profile.InitialSyncCompleted = true;
+                profile.LastSyncAt = now;
+                changed = true;
+                _logger.Info($"CinePersona 反向同步完成: 用户 {profile.UserId}，{imported} 条记录，匹配本地电影 {matched} 条");
             }
 
-            configuration.InitialSyncCompleted = true;
-            configuration.LastSyncAt = now;
-            configuration.LastSyncUserId = syncUserId;
-            plugin.SaveConfiguration();
-            _logger.Info($"CinePersona 反向同步完成: {imported} 条记录，匹配本地电影 {matched} 条");
+            if (changed)
+            {
+                plugin.SaveConfiguration();
+            }
         }
 
         private async Task<SyncPullResponse> FetchSyncPageAsync(
@@ -406,7 +406,7 @@ namespace Emby.Plugin.CinePersona
             public string ImdbId { get; set; }
         }
 
-        private async Task SyncMovieAsync(Movie movie, long positionTicks, string trigger, double? rating)
+        private async Task SyncMovieAsync(Movie movie, long positionTicks, string trigger, double? rating, string userId)
         {
             var plugin = Plugin.Instance;
             if (plugin == null)
@@ -415,10 +415,21 @@ namespace Emby.Plugin.CinePersona
             }
 
             var configuration = plugin.Configuration ?? new PluginConfiguration();
-            var apiKey = (configuration.ApiKey ?? string.Empty).Trim();
+            var profile = configuration.FindUserProfile(userId);
+            if (profile == null && string.Equals(configuration.SyncUserId, userId, StringComparison.OrdinalIgnoreCase))
+            {
+                profile = new UserSyncProfile
+                {
+                    UserId = userId,
+                    ApiKey = configuration.ApiKey,
+                    Enabled = true
+                };
+            }
+
+            var apiKey = profile?.Enabled == true ? (profile.ApiKey ?? string.Empty).Trim() : string.Empty;
             if (apiKey.Length == 0)
             {
-                _logger.Debug("CinePersona API Key 未配置，跳过同步");
+                _logger.Debug($"CinePersona 用户 {userId} 未配置 API Key，跳过同步");
                 return;
             }
 

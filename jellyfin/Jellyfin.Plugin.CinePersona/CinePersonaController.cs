@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Security.Claims;
 using Jellyfin.Plugin.CinePersona.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -39,6 +40,13 @@ public sealed class CinePersonaActivityResponse
     public CinePersonaActivity? Activity { get; set; }
 }
 
+public sealed class CinePersonaSettingsSaveRequest
+{
+    public string? ApiKey { get; set; }
+
+    public bool Enabled { get; set; } = true;
+}
+
 public sealed class CinePersonaActivity
 {
     public string? Status { get; set; }
@@ -62,6 +70,69 @@ public sealed class CinePersonaController : ControllerBase
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
     private static readonly HttpClient HttpClient = new();
 
+    [HttpGet("Settings")]
+    public IActionResult Settings()
+    {
+        var configuration = Plugin.Instance?.Configuration ?? new PluginConfiguration();
+        var userId = GetCurrentUserId();
+        var profile = configuration.FindUserProfile(userId);
+        if (profile is null && string.Equals(configuration.SyncUserId, userId, StringComparison.OrdinalIgnoreCase))
+        {
+            profile = new UserSyncProfile
+            {
+                UserId = userId,
+                ApiKey = (configuration.ApiKey ?? string.Empty).Trim(),
+                Enabled = true
+            };
+        }
+
+        return Ok(new
+        {
+            configured = profile is not null && !string.IsNullOrWhiteSpace(profile.ApiKey),
+            enabled = profile?.Enabled ?? true,
+            userId
+        });
+    }
+
+    [HttpPost("Settings")]
+    public IActionResult SaveSettings([FromBody] CinePersonaSettingsSaveRequest request)
+    {
+        var plugin = Plugin.Instance;
+        var configuration = plugin?.Configuration ?? new PluginConfiguration();
+        var userId = GetCurrentUserId();
+        if (userId.Length == 0)
+        {
+            return Unauthorized(new { error = "Unable to identify the current Jellyfin user" });
+        }
+
+        var profile = configuration.GetOrCreateUserProfile(userId);
+        if (profile is null)
+        {
+            return StatusCode(500, new { error = "Unable to create the CinePersona user profile" });
+        }
+
+        var enteredApiKey = (request?.ApiKey ?? string.Empty).Trim();
+        if (enteredApiKey.Length > 0)
+        {
+            profile.ApiKey = enteredApiKey;
+        }
+
+        if (string.IsNullOrWhiteSpace(profile.ApiKey))
+        {
+            return BadRequest(new { error = "CinePersona API key is required" });
+        }
+
+        profile.Enabled = request?.Enabled ?? true;
+        plugin?.SaveConfiguration();
+        return Ok(new
+        {
+            success = true,
+            configured = true,
+            enabled = profile.Enabled,
+            userId
+        });
+    }
+
     [HttpGet("Activity")]
     public async Task<IActionResult> Activity(
         [FromQuery] string? imdbId,
@@ -69,10 +140,10 @@ public sealed class CinePersonaController : ControllerBase
         CancellationToken cancellationToken)
     {
         var configuration = Plugin.Instance?.Configuration ?? new PluginConfiguration();
-        var apiKey = (configuration.ApiKey ?? string.Empty).Trim();
+        var apiKey = GetCurrentApiKey(configuration);
         if (apiKey.Length == 0)
         {
-            return StatusCode(503, new { error = "CinePersona API key is not configured" });
+            return StatusCode(503, new { error = "CinePersona API key is not configured for the current user" });
         }
 
         imdbId = (imdbId ?? string.Empty).Trim();
@@ -118,10 +189,10 @@ public sealed class CinePersonaController : ControllerBase
         CancellationToken cancellationToken)
     {
         var configuration = Plugin.Instance?.Configuration ?? new PluginConfiguration();
-        var apiKey = configuration.ApiKey.Trim();
+        var apiKey = GetCurrentApiKey(configuration);
         if (apiKey.Length == 0)
         {
-            return StatusCode(503, new { error = "CinePersona API key is not configured" });
+            return StatusCode(503, new { error = "CinePersona API key is not configured for the current user" });
         }
 
         if (request is null || request.Rating < 0.5d || request.Rating > 10d)
@@ -191,5 +262,33 @@ public sealed class CinePersonaController : ControllerBase
         }
 
         return Ok(new { success = true });
+    }
+
+    private string GetCurrentApiKey(PluginConfiguration configuration)
+    {
+        var userId = GetCurrentUserId();
+        var profile = configuration.FindUserProfile(userId);
+        if (profile is not null)
+        {
+            return profile.Enabled ? (profile.ApiKey ?? string.Empty).Trim() : string.Empty;
+        }
+
+        // Keep installations that explicitly configured the old single-user
+        // mode working, without ever using its key for another user.
+        if (string.Equals(configuration.SyncUserId, userId, StringComparison.OrdinalIgnoreCase))
+        {
+            return (configuration.ApiKey ?? string.Empty).Trim();
+        }
+
+        return string.Empty;
+    }
+
+    private string GetCurrentUserId()
+    {
+        var rawUserId = User.FindFirst("Jellyfin-UserId")?.Value
+            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value
+            ?? string.Empty;
+        return Guid.TryParse(rawUserId, out var userId) ? userId.ToString("D") : string.Empty;
     }
 }

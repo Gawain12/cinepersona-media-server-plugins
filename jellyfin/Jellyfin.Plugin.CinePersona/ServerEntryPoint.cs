@@ -113,36 +113,6 @@ public sealed class ServerEntryPoint : IHostedService
             return;
         }
 
-        var apiKey = configuration.ApiKey.Trim();
-        var syncUserId = configuration.SyncUserId.Trim();
-        if (apiKey.Length == 0 || syncUserId.Length == 0)
-        {
-            return;
-        }
-
-        if (!Guid.TryParse(syncUserId, out var userId))
-        {
-            _logger.LogWarning("CinePersona reverse sync user id is invalid");
-            return;
-        }
-
-        var isInitialSync = !configuration.InitialSyncCompleted
-            || !string.Equals(configuration.LastSyncUserId, syncUserId, StringComparison.OrdinalIgnoreCase);
-        var now = DateTime.UtcNow;
-        if (!isInitialSync
-            && configuration.LastSyncAt.HasValue
-            && now - configuration.LastSyncAt.Value.ToUniversalTime() < ReverseSyncInterval)
-        {
-            return;
-        }
-
-        var user = _userManager.GetUserById(userId);
-        if (user is null)
-        {
-            _logger.LogWarning("CinePersona reverse sync user was not found: {UserId}", syncUserId);
-            return;
-        }
-
         var movies = _libraryManager.GetItemList(new InternalItemsQuery
         {
             IncludeItemTypes = new[] { BaseItemKind.Movie },
@@ -150,48 +120,79 @@ public sealed class ServerEntryPoint : IHostedService
             EnableTotalRecordCount = false
         });
         var movieIndex = BuildMovieIndex(movies);
-        DateTime? since = null;
-        if (!isInitialSync && configuration.LastSyncAt.HasValue)
+        var changed = false;
+        foreach (var profile in configuration.GetConfiguredUserProfiles())
         {
-            since = configuration.LastSyncAt.Value.ToUniversalTime().AddMinutes(-5);
-        }
-
-        var offset = 0;
-        var imported = 0;
-        var matched = 0;
-        for (var pageNumber = 0; pageNumber < 100; pageNumber++)
-        {
-            var page = await FetchSyncPageAsync(configuration, apiKey, since, offset).ConfigureAwait(false);
-            var activities = page.Activities ?? Array.Empty<SyncActivity>();
-            foreach (var activity in activities)
+            var apiKey = profile.ApiKey.Trim();
+            if (!profile.Enabled || apiKey.Length == 0 || !Guid.TryParse(profile.UserId, out var userId))
             {
-                imported++;
-                if (ApplySyncActivity(user, activity, movieIndex))
+                continue;
+            }
+
+            var isInitialSync = !profile.InitialSyncCompleted;
+            var now = DateTime.UtcNow;
+            if (!isInitialSync
+                && profile.LastSyncAt.HasValue
+                && now - profile.LastSyncAt.Value.ToUniversalTime() < ReverseSyncInterval)
+            {
+                continue;
+            }
+
+            var user = _userManager.GetUserById(userId);
+            if (user is null)
+            {
+                _logger.LogWarning("CinePersona reverse sync user was not found: {UserId}", profile.UserId);
+                continue;
+            }
+
+            DateTime? since = null;
+            if (!isInitialSync && profile.LastSyncAt.HasValue)
+            {
+                since = profile.LastSyncAt.Value.ToUniversalTime().AddMinutes(-5);
+            }
+
+            var offset = 0;
+            var imported = 0;
+            var matched = 0;
+            for (var pageNumber = 0; pageNumber < 100; pageNumber++)
+            {
+                var page = await FetchSyncPageAsync(configuration, apiKey, since, offset).ConfigureAwait(false);
+                var activities = page.Activities ?? Array.Empty<SyncActivity>();
+                foreach (var activity in activities)
                 {
-                    matched++;
+                    imported++;
+                    if (ApplySyncActivity(user, activity, movieIndex))
+                    {
+                        matched++;
+                    }
+                }
+
+                if (page.Paging is null || !page.Paging.HasMore || activities.Length == 0)
+                {
+                    break;
+                }
+
+                offset += activities.Length;
+                if (pageNumber == 99)
+                {
+                    throw new InvalidOperationException("CinePersona reverse sync exceeded 100 pages");
                 }
             }
 
-            if (page.Paging is null || !page.Paging.HasMore || activities.Length == 0)
-            {
-                break;
-            }
-
-            offset += activities.Length;
-            if (pageNumber == 99)
-            {
-                throw new InvalidOperationException("CinePersona reverse sync exceeded 100 pages");
-            }
+            profile.InitialSyncCompleted = true;
+            profile.LastSyncAt = now;
+            changed = true;
+            _logger.LogInformation(
+                "CinePersona reverse sync completed for user {UserId}: {Imported} records, {Matched} local movies",
+                profile.UserId,
+                imported,
+                matched);
         }
 
-        configuration.InitialSyncCompleted = true;
-        configuration.LastSyncAt = now;
-        configuration.LastSyncUserId = syncUserId;
-        Plugin.Instance?.SaveConfiguration();
-        _logger.LogInformation(
-            "CinePersona reverse sync completed: {Imported} records, {Matched} local movies",
-            imported,
-            matched);
+        if (changed)
+        {
+            Plugin.Instance?.SaveConfiguration();
+        }
     }
 
     private async Task<SyncPullResponse> FetchSyncPageAsync(
@@ -380,7 +381,7 @@ public sealed class ServerEntryPoint : IHostedService
     {
         try
         {
-            await SyncPlaybackAsync(e).ConfigureAwait(false);
+            await SyncPlaybackAsync(e, e?.Session?.UserId.ToString()).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
@@ -403,7 +404,7 @@ public sealed class ServerEntryPoint : IHostedService
                 var positionTicks = runtimeTicks > 0
                     ? runtimeTicks
                     : e.UserData.PlaybackPositionTicks;
-                await SyncMovieAsync(movie, positionTicks, "手动标记看过").ConfigureAwait(false);
+                await SyncMovieAsync(movie, positionTicks, "手动标记看过", null, e.UserId.ToString()).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
@@ -418,7 +419,8 @@ public sealed class ServerEntryPoint : IHostedService
                     movie,
                     movie.RunTimeTicks ?? 0,
                     "Jellyfin 星级评价",
-                    e.UserData.Rating).ConfigureAwait(false);
+                    e.UserData.Rating,
+                    e.UserId.ToString()).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
@@ -427,17 +429,17 @@ public sealed class ServerEntryPoint : IHostedService
         }
     }
 
-    private async Task SyncPlaybackAsync(PlaybackStopEventArgs e)
+    private async Task SyncPlaybackAsync(PlaybackStopEventArgs e, string userId)
     {
         if (e.Item is not Movie movie)
         {
             return;
         }
 
-        await SyncMovieAsync(movie, e.PlaybackPositionTicks ?? 0, "播放停止").ConfigureAwait(false);
+        await SyncMovieAsync(movie, e.PlaybackPositionTicks ?? 0, "播放停止", null, userId).ConfigureAwait(false);
     }
 
-    private async Task SyncMovieAsync(Movie movie, long positionTicks, string trigger, double? rating = null)
+    private async Task SyncMovieAsync(Movie movie, long positionTicks, string trigger, double? rating, string userId)
     {
         var configuration = Plugin.Instance?.Configuration;
         if (configuration is null)
@@ -445,10 +447,21 @@ public sealed class ServerEntryPoint : IHostedService
             return;
         }
 
-        var apiKey = configuration.ApiKey.Trim();
+        var profile = configuration.FindUserProfile(userId);
+        if (profile is null && string.Equals(configuration.SyncUserId, userId, StringComparison.OrdinalIgnoreCase))
+        {
+            profile = new UserSyncProfile
+            {
+                UserId = userId,
+                ApiKey = configuration.ApiKey,
+                Enabled = true
+            };
+        }
+
+        var apiKey = profile?.Enabled == true ? profile.ApiKey.Trim() : string.Empty;
         if (apiKey.Length == 0)
         {
-            _logger.LogDebug("CinePersona API key is not configured");
+            _logger.LogDebug("CinePersona API key is not configured for user {UserId}", userId);
             return;
         }
 

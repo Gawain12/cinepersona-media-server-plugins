@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Emby.Plugin.CinePersona.Configuration;
+using MediaBrowser.Common;
 using MediaBrowser.Controller.Net;
 using MediaBrowser.Model.Services;
 using MediaBrowser.Model.Serialization;
@@ -40,6 +41,21 @@ namespace Emby.Plugin.CinePersona
         public string TmdbId { get; set; }
     }
 
+    [Route("/CinePersona/Settings", "GET")]
+    [Authenticated]
+    public class CinePersonaSettingsRequest
+    {
+    }
+
+    [Route("/CinePersona/Settings", "POST")]
+    [Authenticated]
+    public class CinePersonaSettingsSaveRequest
+    {
+        public string ApiKey { get; set; }
+
+        public bool Enabled { get; set; } = true;
+    }
+
     public class CinePersonaActivityResponse
     {
         public bool Success { get; set; }
@@ -64,25 +80,96 @@ namespace Emby.Plugin.CinePersona
         public string RatedAt { get; set; }
     }
 
-    public class CinePersonaWebService : IService
+    public class CinePersonaWebService : IService, IRequiresRequest
     {
         private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
         private static readonly HttpClient HttpClient = new HttpClient();
 
         private readonly IJsonSerializer _jsonSerializer;
+        private readonly IAuthorizationContext _authorizationContext;
 
-        public CinePersonaWebService(IJsonSerializer jsonSerializer)
+        public IRequest Request { get; set; }
+
+        public CinePersonaWebService(IJsonSerializer jsonSerializer, IAuthorizationContext authorizationContext)
         {
             _jsonSerializer = jsonSerializer;
+            _authorizationContext = authorizationContext;
+        }
+
+        public object Get(CinePersonaSettingsRequest request)
+        {
+            var configuration = Plugin.Instance?.Configuration ?? new PluginConfiguration();
+            var userId = GetCurrentUserId();
+            var profile = configuration.FindUserProfile(userId);
+            if (profile == null && string.Equals(configuration.SyncUserId, userId, StringComparison.OrdinalIgnoreCase))
+            {
+                profile = new UserSyncProfile
+                {
+                    UserId = userId,
+                    ApiKey = (configuration.ApiKey ?? string.Empty).Trim(),
+                    Enabled = true
+                };
+            }
+
+            return new
+            {
+                Configured = profile != null && !string.IsNullOrWhiteSpace(profile.ApiKey),
+                Enabled = profile == null || profile.Enabled,
+                UserId = userId
+            };
+        }
+
+        public object Post(CinePersonaSettingsSaveRequest request)
+        {
+            var plugin = Plugin.Instance;
+            var configuration = plugin?.Configuration ?? new PluginConfiguration();
+            var userId = GetCurrentUserId();
+            if (userId.Length == 0)
+            {
+                throw new InvalidOperationException("无法识别当前 Emby 用户");
+            }
+
+            var profile = configuration.GetOrCreateUserProfile(userId);
+            if (profile == null)
+            {
+                throw new InvalidOperationException("无法创建 CinePersona 用户配置");
+            }
+
+            var enteredApiKey = (request?.ApiKey ?? string.Empty).Trim();
+            if (enteredApiKey.Length > 0)
+            {
+                profile.ApiKey = enteredApiKey;
+            }
+
+            if (string.IsNullOrWhiteSpace(profile.ApiKey))
+            {
+                throw new InvalidOperationException("请填写 CinePersona API Key");
+            }
+
+            profile.Enabled = request?.Enabled ?? true;
+            plugin?.SaveConfiguration();
+            return new
+            {
+                Success = true,
+                Configured = true,
+                Enabled = profile.Enabled,
+                UserId = userId
+            };
+        }
+
+        private string GetCurrentUserId()
+        {
+            var authorization = _authorizationContext?.GetAuthorizationInfo(Request);
+            return authorization?.UserId.ToString() ?? string.Empty;
         }
 
         public async Task<object> Post(CinePersonaReviewRequest request)
         {
             var configuration = Plugin.Instance?.Configuration ?? new PluginConfiguration();
-            var apiKey = (configuration.ApiKey ?? string.Empty).Trim();
+            var apiKey = GetCurrentApiKey(configuration);
             if (apiKey.Length == 0)
             {
-                throw new InvalidOperationException("CinePersona API Key 未配置");
+                throw new InvalidOperationException("当前 Emby 用户尚未配置 CinePersona API Key");
             }
 
             if (request == null || request.Rating < 0.5d || request.Rating > 10d)
@@ -163,10 +250,10 @@ namespace Emby.Plugin.CinePersona
         public async Task<object> Get(CinePersonaActivityRequest request)
         {
             var configuration = Plugin.Instance?.Configuration ?? new PluginConfiguration();
-            var apiKey = (configuration.ApiKey ?? string.Empty).Trim();
+            var apiKey = GetCurrentApiKey(configuration);
             if (apiKey.Length == 0)
             {
-                throw new InvalidOperationException("CinePersona API Key 未配置");
+                throw new InvalidOperationException("当前 Emby 用户尚未配置 CinePersona API Key");
             }
 
             var imdbId = (request?.ImdbId ?? string.Empty).Trim();
@@ -206,6 +293,25 @@ namespace Emby.Plugin.CinePersona
                     return _jsonSerializer.DeserializeFromString<CinePersonaActivityResponse>(responseBody);
                 }
             }
+        }
+
+        private string GetCurrentApiKey(PluginConfiguration configuration)
+        {
+            var userId = GetCurrentUserId();
+            var profile = configuration.FindUserProfile(userId);
+            if (profile != null)
+            {
+                return profile.Enabled ? (profile.ApiKey ?? string.Empty).Trim() : string.Empty;
+            }
+
+            // Keep installations that explicitly configured the old single-user
+            // mode working, without ever using its key for another user.
+            if (string.Equals(configuration.SyncUserId, userId, StringComparison.OrdinalIgnoreCase))
+            {
+                return (configuration.ApiKey ?? string.Empty).Trim();
+            }
+
+            return string.Empty;
         }
     }
 }

@@ -7,26 +7,14 @@
     <div data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button">
         <div class="content-primary">
             <form class="cinepersonaConfigurationForm">
-                <h2>CinePersona 观影同步设置</h2>
-                <p>观影完成度达到 80% 后，插件会将电影记录同步到 CinePersona。</p>
-                <p>请先在 CinePersona 设置中创建具有 <code>sync.write</code> 权限的 API Key。</p>
-
-                <div class="inputContainer">
-                    <label class="inputLabel" for="txtApiKey">API Key:</label>
-                    <input is="emby-input" type="password" id="txtApiKey" name="txtApiKey" autocomplete="off" required />
-                    <div class="fieldDescription">格式示例：cpk_xxxxxxxx_yyyyyyyy</div>
-                </div>
+                <h2>CinePersona 服务器设置</h2>
+                <p>观影完成度达到 80% 后，按当前登录用户同步电影记录、看过状态和评分。</p>
+                <p>每位用户请在电影页面的 CinePersona 评分按钮中填写自己的 API Key。</p>
 
                 <div class="inputContainer">
                     <label class="inputLabel" for="txtServerUrl">CinePersona 地址:</label>
                     <input is="emby-input" type="url" id="txtServerUrl" name="txtServerUrl" value="https://cinepersona.com" required />
                     <div class="fieldDescription">测试环境可填写 https://test.gawyn.de</div>
-                </div>
-
-                <div class="inputContainer">
-                    <label class="inputLabel" for="txtSyncUserId">同步到哪个 Jellyfin 用户:</label>
-                    <input is="emby-input" type="text" id="txtSyncUserId" name="txtSyncUserId" autocomplete="off" />
-                    <div class="fieldDescription">默认填入当前登录用户。首次同步会把 CinePersona 的已看电影补到这个用户。</div>
                 </div>
 
                 <label class="checkboxContainer">
@@ -46,9 +34,7 @@
             $('.cinepersonaConfigurationForm').on('pageshow', function () {
                 var form = this;
                 ApiClient.getPluginConfiguration(CinePersonaConfig.pluginUniqueId).then(function (config) {
-                    $('#txtApiKey', form).val(config.ApiKey || '');
                     $('#txtServerUrl', form).val(config.ServerUrl || 'https://cinepersona.com');
-                    $('#txtSyncUserId', form).val(config.SyncUserId || (ApiClient.getCurrentUserId ? ApiClient.getCurrentUserId() : ''));
                     $('#chkReverseSync', form).prop('checked', config.ReverseSyncEnabled !== false);
                 });
             });
@@ -56,9 +42,7 @@
             $('.cinepersonaConfigurationForm').on('submit', function () {
                 var form = this;
                 ApiClient.getPluginConfiguration(CinePersonaConfig.pluginUniqueId).then(function (config) {
-                    config.ApiKey = $('#txtApiKey', form).val();
                     config.ServerUrl = $('#txtServerUrl', form).val();
-                    config.SyncUserId = $('#txtSyncUserId', form).val().trim();
                     config.ReverseSyncEnabled = $('#chkReverseSync', form).prop('checked');
                     ApiClient.updatePluginConfiguration(CinePersonaConfig.pluginUniqueId, config).then(function (result) {
                         Dashboard.processPluginConfigurationUpdateResult(result);

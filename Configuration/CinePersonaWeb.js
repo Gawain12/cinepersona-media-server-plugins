@@ -9,10 +9,10 @@
         }
     } catch (e) {}
 
-    if (window.__cinePersonaWebVersion === "0.2.8") {
+    if (window.__cinePersonaWebVersion === "0.2.9") {
         return;
     }
-    window.__cinePersonaWebVersion = "0.2.8";
+    window.__cinePersonaWebVersion = "0.2.9";
     window.__cinePersonaWebLoaded = true;
 
     var state = {
@@ -21,7 +21,8 @@
         modal: null,
         rating: 0,
         hasSpoiler: false,
-        activity: null
+        activity: null,
+        settings: { Configured: false, Enabled: true }
     };
 
     function apiUrl(path) {
@@ -202,6 +203,18 @@
         });
     }
 
+    function getCinePersonaSettings() {
+        return apiRequest("CinePersona/Settings").then(function (data) {
+            data = data || {};
+            return {
+                Configured: data.Configured !== undefined ? !!data.Configured : !!data.configured,
+                Enabled: data.Enabled !== undefined ? data.Enabled !== false : data.enabled !== false
+            };
+        }).catch(function () {
+            return { Configured: false, Enabled: true };
+        });
+    }
+
     function formatRating(rating) {
         var value = validRating(rating);
         if (!value) {
@@ -362,9 +375,11 @@
             btn.className = "cinepersona-detail-button cinepersona-injected-trigger";
             var rating = itemRating(state.item);
             btn.className += rating ? " is-rated" : "";
-            btn.title = rating ? "修改 CinePersona 评分（" + formatRating(rating) + "）" : "在 CinePersona 评分并写短评";
+            btn.title = state.settings && state.settings.Configured
+                ? (rating ? "修改 CinePersona 评分（" + formatRating(rating) + "）" : "在 CinePersona 评分并写短评")
+                : "连接 CinePersona";
             btn.setAttribute("aria-label", btn.title);
-            btn.innerHTML = '<span class="cinepersona-btn-icon">★</span><span class="cinepersona-btn-label">' + formatRating(rating) + '</span>';
+            btn.innerHTML = '<span class="cinepersona-btn-icon">★</span><span class="cinepersona-btn-label">' + (state.settings && state.settings.Configured ? formatRating(rating) : "连接") + '</span>';
             btn.addEventListener("click", openModal);
 
             // 插入在合适的位置（例如如果是评分按钮之前或直接加在主按钮最后）
@@ -448,8 +463,94 @@
         });
     }
 
+    function openSettingsModal() {
+        closeModal();
+        var settings = state.settings || { Configured: false, Enabled: true };
+        var modal = makeElement("div");
+        modal.id = "cinepersona-review-modal";
+        modal.setAttribute("role", "dialog");
+        modal.setAttribute("aria-modal", "true");
+
+        var card = makeElement("div", "cinepersona-review-card");
+        var title = makeElement("h2", "cinepersona-review-title", "连接 CinePersona");
+        var copy = makeElement("p", "cinepersona-review-copy", "当前 Emby 用户单独保存自己的观影记录和评分。");
+        var label = makeElement("label", "cinepersona-review-label", "API Key");
+        var input = makeElement("input", "cinepersona-review-text");
+        input.type = "password";
+        input.autocomplete = "off";
+        input.placeholder = settings.Configured ? "已配置，留空保持不变" : "cpk_…";
+        var enabledLabel = makeElement("label", "cinepersona-review-spoiler");
+        var enabledInput = document.createElement("input");
+        enabledInput.type = "checkbox";
+        enabledInput.checked = settings.Enabled !== false;
+        enabledLabel.appendChild(enabledInput);
+        enabledLabel.appendChild(document.createTextNode("启用同步"));
+        var status = makeElement("p", "cinepersona-review-status");
+        var actions = makeElement("div", "cinepersona-review-actions");
+        var cancel = makeElement("button", "cinepersona-review-action", "取消");
+        var submit = makeElement("button", "cinepersona-review-action primary", "保存");
+        cancel.type = "button";
+        submit.type = "button";
+        label.htmlFor = "cinepersona-settings-key";
+        input.id = "cinepersona-settings-key";
+        cancel.addEventListener("click", closeModal);
+        submit.addEventListener("click", function () {
+            if (!settings.Configured && !input.value.trim()) {
+                status.textContent = "请填写 API Key。";
+                return;
+            }
+
+            submit.disabled = true;
+            cancel.disabled = true;
+            status.style.color = "";
+            status.textContent = "正在保存…";
+            apiRequest("CinePersona/Settings", {
+                method: "POST",
+                body: JSON.stringify({ ApiKey: input.value.trim(), Enabled: !!enabledInput.checked })
+            }).then(function (result) {
+                state.settings = {
+                    Configured: result && result.Configured !== undefined ? !!result.Configured : true,
+                    Enabled: result && result.Enabled !== undefined ? result.Enabled !== false : enabledInput.checked
+                };
+                status.style.color = "#238653";
+                status.textContent = "已保存。";
+                window.setTimeout(function () {
+                    closeModal();
+                    refresh();
+                }, 450);
+            }).catch(function (error) {
+                submit.disabled = false;
+                cancel.disabled = false;
+                status.textContent = "保存失败：" + (error && error.message ? error.message : "请稍后重试");
+            });
+        });
+
+        actions.appendChild(cancel);
+        actions.appendChild(submit);
+        card.appendChild(title);
+        card.appendChild(copy);
+        card.appendChild(label);
+        card.appendChild(input);
+        card.appendChild(enabledLabel);
+        card.appendChild(status);
+        card.appendChild(actions);
+        modal.appendChild(card);
+        modal.addEventListener("click", function (event) {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+        state.modal = modal;
+        document.body.appendChild(modal);
+        input.focus();
+    }
+
     function openModal() {
         if (!state.item || state.item.Type !== "Movie") {
+            return;
+        }
+        if (!state.settings || !state.settings.Configured) {
+            openSettingsModal();
             return;
         }
         closeModal();
@@ -484,10 +585,13 @@
         var status = makeElement("p", "cinepersona-review-status");
         var actions = makeElement("div", "cinepersona-review-actions");
         var webLink = makeElement("a", "cinepersona-review-action cinepersona-review-action-link", "看完整评价");
+        var settingsLink = makeElement("button", "cinepersona-review-action cinepersona-review-action-link", "同步设置");
         var cancel = makeElement("button", "cinepersona-review-action", "取消");
         var submit = makeElement("button", "cinepersona-review-action primary", "保存");
         cancel.type = "button";
         submit.type = "button";
+        settingsLink.type = "button";
+        settingsLink.addEventListener("click", openSettingsModal);
         var webUrl = cinePersonaWebUrl(state.item);
         if (webUrl) {
             webLink.href = webUrl;
@@ -537,6 +641,7 @@
         });
 
         actions.appendChild(webLink);
+        actions.appendChild(settingsLink);
         actions.appendChild(cancel);
         actions.appendChild(submit);
         card.appendChild(title);
@@ -613,6 +718,16 @@
         });
     }
 
+    function refreshSettings() {
+        getCinePersonaSettings().then(function (settings) {
+            state.settings = settings;
+            removeTriggers();
+            if (state.item && state.item.Type === "Movie") {
+                setTriggerVisible(true);
+            }
+        });
+    }
+
     function scheduleRefresh() {
         if (state.refreshScheduled) {
             return;
@@ -662,5 +777,6 @@
     ensureStyles();
     installNavigationWatchers();
     window.setInterval(refresh, 1000);
+    refreshSettings();
     refresh();
 })();
