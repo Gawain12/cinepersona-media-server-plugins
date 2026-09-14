@@ -75,17 +75,27 @@ namespace Emby.Plugin.CinePersona
                 }
 
                 var contents = File.ReadAllText(indexPath);
-                const string marker = "data-cinepersona-web=\"true\"";
-                if (contents.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0)
+                var version = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "0.1.19";
+                var expectedScript = string.Format("<script data-cinepersona-web=\"true\" src=\"/web/ConfigurationPage?name=CinePersonaWeb&v={0}\"></script>", version);
+
+                if (contents.IndexOf(expectedScript, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     return;
                 }
 
-                const string script = "<script data-cinepersona-web=\"true\" src=\"/web/ConfigurationPage?name=CinePersonaWeb\"></script>";
-                var bodyIndex = contents.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
-                contents = bodyIndex >= 0
-                    ? contents.Insert(bodyIndex, script)
-                    : contents + script;
+                // 如果已有旧版本的标签（包括无版本号或旧版本号），直接替换
+                var regex = new System.Text.RegularExpressions.Regex(@"<script\s+[^>]*data-cinepersona-web=""true""[^>]*></script>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (regex.IsMatch(contents))
+                {
+                    contents = regex.Replace(contents, expectedScript);
+                }
+                else
+                {
+                    var bodyIndex = contents.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+                    contents = bodyIndex >= 0
+                        ? contents.Insert(bodyIndex, expectedScript)
+                        : contents + expectedScript;
+                }
                 File.WriteAllText(indexPath, contents);
             }
             catch

@@ -1,9 +1,18 @@
 (function () {
     "use strict";
 
-    if (window.__cinePersonaWebLoaded) {
+    // 强杀旧版本遗留的右下角悬浮球
+    try {
+        var legacyTrigger = document.getElementById("cinepersona-review-trigger");
+        if (legacyTrigger) {
+            legacyTrigger.remove();
+        }
+    } catch (e) {}
+
+    if (window.__cinePersonaWebVersion === "0.1.19") {
         return;
     }
+    window.__cinePersonaWebVersion = "0.1.19";
     window.__cinePersonaWebLoaded = true;
 
     var state = {
