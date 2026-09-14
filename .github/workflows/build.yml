@@ -31,6 +31,15 @@ jobs:
       - name: Build Jellyfin plugin
         run: dotnet build jellyfin/Jellyfin.Plugin.CinePersona/Jellyfin.Plugin.CinePersona.csproj -c Release --no-restore
 
+      - name: Upload plugin binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: cinepersona-plugins-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            **/bin/Release/**/Emby.Plugin.CinePersona.dll
+            **/bin/Release/**/Jellyfin.Plugin.CinePersona.dll
+
       - name: Test Plex relay
         working-directory: plex/CinePersona.PlexRelay
         run: go test ./...
