@@ -182,7 +182,7 @@ namespace Emby.Plugin.CinePersona
                 IncludeItemTypes = new[] { "Movie" },
                 Recursive = true,
                 EnableTotalRecordCount = false
-            }).Items;
+            });
             var movieIndex = BuildMovieIndex(movies);
             DateTime? since = null;
             if (!isInitialSync && configuration.LastSyncAt.HasValue)
