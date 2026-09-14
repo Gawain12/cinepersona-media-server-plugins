@@ -9,10 +9,10 @@
         }
     } catch (e) {}
 
-    if (window.__cinePersonaWebVersion === "0.2.6") {
+    if (window.__cinePersonaWebVersion === "0.2.7") {
         return;
     }
-    window.__cinePersonaWebVersion = "0.2.6";
+    window.__cinePersonaWebVersion = "0.2.7";
     window.__cinePersonaWebLoaded = true;
 
     var state = {
@@ -607,6 +607,10 @@
 
         window.addEventListener("hashchange", scheduleRefresh);
         window.addEventListener("popstate", scheduleRefresh);
+        document.addEventListener("click", function () {
+            scheduleRefresh();
+            window.setTimeout(scheduleRefresh, 700);
+        }, true);
         if (window.MutationObserver && document.body) {
             var observer = new MutationObserver(function (mutations) {
                 for (var i = 0; i < mutations.length; i++) {
