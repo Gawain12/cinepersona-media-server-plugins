@@ -9,17 +9,19 @@
         }
     } catch (e) {}
 
-    if (window.__cinePersonaWebVersion === "0.2.1") {
+    if (window.__cinePersonaWebVersion === "0.2.2") {
         return;
     }
-    window.__cinePersonaWebVersion = "0.2.1";
+    window.__cinePersonaWebVersion = "0.2.2";
     window.__cinePersonaWebLoaded = true;
 
     var state = {
         itemId: null,
         item: null,
         modal: null,
-        rating: 0
+        rating: 0,
+        hasSpoiler: false,
+        activity: null
     };
 
     function apiUrl(path) {
@@ -137,9 +139,53 @@
         } catch (ignore) {}
     }
 
+    function spoilerStorageKey(itemId) {
+        return "cinepersona:spoiler:" + String(window.location.host || "jellyfin") + ":" + String(itemId || "");
+    }
+
+    function readStoredSpoiler(itemId) {
+        try {
+            return window.localStorage.getItem(spoilerStorageKey(itemId)) === "1";
+        } catch (ignore) {
+            return false;
+        }
+    }
+
+    function storeSpoiler(itemId, hasSpoiler) {
+        try {
+            window.localStorage.setItem(spoilerStorageKey(itemId), hasSpoiler ? "1" : "0");
+        } catch (ignore) {}
+    }
+
+    function activityValue(activity, name) {
+        if (!activity) {
+            return undefined;
+        }
+        if (activity[name] !== undefined && activity[name] !== null) {
+            return activity[name];
+        }
+        var lowerName = name.charAt(0).toLowerCase() + name.slice(1);
+        return activity[lowerName];
+    }
+
     function itemRating(item) {
+        var activityRating = validRating(activityValue(state.activity, "Rating"));
         var nativeRating = item && item.UserData ? validRating(item.UserData.Rating) : 0;
-        return nativeRating || readStoredRating(item && item.Id);
+        return activityRating || nativeRating || readStoredRating(item && item.Id);
+    }
+
+    function getCinePersonaActivity(item) {
+        var ids = item && item.ProviderIds ? item.ProviderIds : {};
+        var imdbId = providerId(ids, "imdb");
+        var tmdbId = providerId(ids, "tmdb");
+        if (!imdbId && !tmdbId) {
+            return Promise.resolve(null);
+        }
+
+        var query = "CinePersona/Activity?ImdbId=" + encodeURIComponent(imdbId) + "&TmdbId=" + encodeURIComponent(tmdbId);
+        return apiRequest(query).then(function (data) {
+            return data && (data.Activity || data.activity) ? (data.Activity || data.activity) : null;
+        });
     }
 
     function formatRating(rating) {
@@ -166,8 +212,9 @@
             "#cinepersona-review-modal{position:fixed;inset:0;z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(10,18,30,.58);font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}" +
             ".cinepersona-review-card{width:min(430px,100%);max-height:calc(100vh - 40px);overflow:auto;border:1px solid rgba(255,255,255,.48);border-radius:18px;padding:25px;background:rgba(250,248,245,.97);color:#253142;box-shadow:0 24px 70px rgba(0,0,0,.34)}" +
             ".cinepersona-review-kicker{margin:0 0 7px;color:#315c9a;font-size:11px;font-weight:750;letter-spacing:.14em;text-transform:uppercase}.cinepersona-review-title{margin:0;font-size:22px;line-height:1.28}.cinepersona-review-copy{margin:8px 0 20px;color:#637083;font-size:13px;line-height:1.5}.cinepersona-review-stars{display:flex;justify-content:center;gap:1px;margin:4px 0 8px}.cinepersona-review-star{border:0;padding:2px;background:transparent;color:#aeb8c5;font-size:27px;line-height:1;cursor:pointer}.cinepersona-review-star.is-selected{color:#315c9a}.cinepersona-review-score{min-height:20px;margin:0 0 17px;text-align:center;color:#315c9a;font-size:13px;font-weight:650}.cinepersona-review-label{display:block;margin:0 0 7px;color:#536173;font-size:12px;font-weight:650}.cinepersona-review-text{display:block;width:100%;min-height:104px;box-sizing:border-box;resize:vertical;border:1px solid #d3dae3;border-radius:10px;padding:11px 12px;background:#fff;color:#253142;font:14px/1.55 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;outline:none}.cinepersona-review-text:focus{border-color:#315c9a;box-shadow:0 0 0 3px rgba(49,92,154,.13)}.cinepersona-review-note{margin:8px 0 0;color:#7b8797;font-size:12px;line-height:1.4}.cinepersona-review-status{min-height:19px;margin:15px 0 0;color:#b42318;font-size:13px;line-height:1.4}.cinepersona-review-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:17px}.cinepersona-review-action{min-width:88px;border:1px solid #315c9a;border-radius:9px;padding:10px 15px;background:transparent;color:#315c9a;font:650 14px system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer}.cinepersona-review-action.primary{background:#315c9a;color:#fff}.cinepersona-review-action:disabled{opacity:.55;cursor:wait}" +
+            ".cinepersona-review-spoiler{display:flex;align-items:center;gap:8px;margin:12px 0 0;color:#536173;font-size:13px;line-height:1.4;cursor:pointer}.cinepersona-review-spoiler input{width:16px;height:16px;margin:0;accent-color:#315c9a}" +
             "/* 暗色模式适配 */" +
-            "@media (prefers-color-scheme:dark){.cinepersona-detail-button{background:rgba(255,255,255,.14);color:#edf2f8}.cinepersona-detail-button:hover{background:rgba(255,255,255,.25)}.cinepersona-detail-button.is-rated{background:rgba(73,121,182,.46);color:#e5f0ff}.cinepersona-review-card{background:rgba(30,37,48,.98);color:#edf2f8}.cinepersona-review-copy,.cinepersona-review-note,.cinepersona-review-label{color:#aab5c4}.cinepersona-review-text{border-color:#465363;background:#232c38;color:#edf2f8}.cinepersona-review-star{color:#667386}.cinepersona-review-star.is-selected,.cinepersona-review-kicker,.cinepersona-review-score{color:#a9c7f2}.cinepersona-review-action{border-color:#8eb2e4;color:#bcd4f2}.cinepersona-review-action.primary{background:#4779b6;color:#fff}}" +
+            "@media (prefers-color-scheme:dark){.cinepersona-detail-button{background:rgba(255,255,255,.14);color:#edf2f8}.cinepersona-detail-button:hover{background:rgba(255,255,255,.25)}.cinepersona-detail-button.is-rated{background:rgba(73,121,182,.46);color:#e5f0ff}.cinepersona-review-card{background:rgba(30,37,48,.98);color:#edf2f8}.cinepersona-review-copy,.cinepersona-review-note,.cinepersona-review-label,.cinepersona-review-spoiler{color:#aab5c4}.cinepersona-review-text{border-color:#465363;background:#232c38;color:#edf2f8}.cinepersona-review-star{color:#667386}.cinepersona-review-star.is-selected,.cinepersona-review-kicker,.cinepersona-review-score{color:#a9c7f2}.cinepersona-review-action{border-color:#8eb2e4;color:#bcd4f2}.cinepersona-review-action.primary{background:#4779b6;color:#fff}}" +
             "@media (max-width:560px){.cinepersona-detail-button{padding:.5em .7em;font-size:.88em}.cinepersona-review-card{padding:21px;border-radius:15px}.cinepersona-review-stars{gap:0}.cinepersona-review-star{font-size:24px}}";
         document.head.appendChild(style);
     }
@@ -267,7 +314,7 @@
         });
     }
 
-    function sendToCinePersona(item, rating, reviewText) {
+    function sendToCinePersona(item, rating, reviewText, hasSpoiler) {
         var ids = item.ProviderIds || {};
         return apiRequest("CinePersona/Review", {
             method: "POST",
@@ -278,7 +325,8 @@
                 ImdbId: providerId(ids, "imdb"),
                 TmdbId: providerId(ids, "tmdb"),
                 Rating: rating,
-                ReviewText: reviewText
+                ReviewText: reviewText,
+                HasSpoiler: !!hasSpoiler
             })
         });
     }
@@ -289,6 +337,11 @@
         }
         closeModal();
         state.rating = itemRating(state.item);
+        var activityReview = activityValue(state.activity, "ReviewText");
+        var activitySpoiler = activityValue(state.activity, "HasSpoiler");
+        state.hasSpoiler = activitySpoiler !== undefined
+            ? !!activitySpoiler
+            : readStoredSpoiler(state.item && state.item.Id);
 
         var modal = makeElement("div");
         modal.id = "cinepersona-review-modal";
@@ -297,7 +350,7 @@
         var card = makeElement("div", "cinepersona-review-card");
         var kicker = makeElement("p", "cinepersona-review-kicker", "CinePersona");
         var title = makeElement("h2", "cinepersona-review-title", state.item.Name || "评价这部电影");
-        var copy = makeElement("p", "cinepersona-review-copy", "评分会保存到 Jellyfin 和 CinePersona；短评只同步到 CinePersona。");
+        var copy = makeElement("p", "cinepersona-review-copy", "评分会保存到 Jellyfin 和 CinePersona，短评同步到 CinePersona。");
         var stars = makeElement("div", "cinepersona-review-stars");
         var score = makeElement("p", "cinepersona-review-score");
         var label = makeElement("label", "cinepersona-review-label", "短评（可选）");
@@ -305,11 +358,18 @@
         textarea.id = "cinepersona-review-text";
         textarea.placeholder = "写下这部电影给你的感受…";
         textarea.maxLength = 4000;
+        textarea.value = typeof activityReview === "string" ? activityReview : "";
+        var spoilerLabel = makeElement("label", "cinepersona-review-spoiler");
+        var spoilerInput = document.createElement("input");
+        spoilerInput.type = "checkbox";
+        spoilerInput.checked = state.hasSpoiler;
+        spoilerLabel.appendChild(spoilerInput);
+        spoilerLabel.appendChild(document.createTextNode("这条短评包含剧透"));
         var note = makeElement("p", "cinepersona-review-note", "电影会按已看过处理，评分范围 1–10。");
         var status = makeElement("p", "cinepersona-review-status");
         var actions = makeElement("div", "cinepersona-review-actions");
         var cancel = makeElement("button", "cinepersona-review-action", "取消");
-        var submit = makeElement("button", "cinepersona-review-action primary", "提交评价");
+        var submit = makeElement("button", "cinepersona-review-action primary", "保存");
         cancel.type = "button";
         submit.type = "button";
         label.htmlFor = textarea.id;
@@ -321,13 +381,14 @@
                 return;
             }
             var reviewText = textarea.value.trim();
+            state.hasSpoiler = !!spoilerInput.checked;
             submit.disabled = true;
             cancel.disabled = true;
             status.style.color = "";
             status.textContent = "正在保存…";
             Promise.all([
                 saveNativeRating(state.item, state.rating),
-                sendToCinePersona(state.item, state.rating, reviewText)
+                sendToCinePersona(state.item, state.rating, reviewText, state.hasSpoiler)
             ]).then(function () {
                 if (state.item.UserData) {
                     state.item.UserData.Rating = state.rating;
@@ -336,6 +397,7 @@
                     state.item.UserData = { Rating: state.rating, Played: true };
                 }
                 storeRating(state.item.Id, state.rating);
+                storeSpoiler(state.item.Id, state.hasSpoiler && reviewText.length > 0);
                 removeTriggers();
                 injectTriggers();
                 status.style.color = "#238653";
@@ -356,6 +418,7 @@
         card.appendChild(score);
         card.appendChild(label);
         card.appendChild(textarea);
+        card.appendChild(spoilerLabel);
         card.appendChild(note);
         card.appendChild(status);
         card.appendChild(actions);
@@ -381,6 +444,7 @@
         if (!itemId) {
             state.itemId = null;
             state.item = null;
+            state.activity = null;
             setTriggerVisible(false);
             closeModal();
             return;
@@ -391,15 +455,31 @@
         }
         state.itemId = itemId;
         state.item = null;
+        state.activity = null;
         setTriggerVisible(false);
         getItem(itemId).then(function (item) {
             if (state.itemId !== itemId) {
                 return;
             }
             state.item = item;
+            state.activity = null;
             setTriggerVisible(item && item.Type === "Movie");
+            if (!item || item.Type !== "Movie") {
+                return;
+            }
+            getCinePersonaActivity(item).then(function (activity) {
+                if (state.itemId !== itemId) {
+                    return;
+                }
+                state.activity = activity;
+                removeTriggers();
+                setTriggerVisible(true);
+            }).catch(function () {
+                // 评分回显失败时仍保留平台本地评分和本地缓存的操作入口。
+            });
         }).catch(function () {
             if (state.itemId === itemId) {
+                state.activity = null;
                 setTriggerVisible(false);
             }
         });

@@ -26,6 +26,32 @@ public sealed class CinePersonaReviewRequest
     public double Rating { get; set; }
 
     public string? ReviewText { get; set; }
+
+    public bool HasSpoiler { get; set; }
+}
+
+public sealed class CinePersonaActivityResponse
+{
+    public bool Success { get; set; }
+
+    public string? MovieId { get; set; }
+
+    public CinePersonaActivity? Activity { get; set; }
+}
+
+public sealed class CinePersonaActivity
+{
+    public string? Status { get; set; }
+
+    public double? Rating { get; set; }
+
+    public string? ReviewText { get; set; }
+
+    public bool HasSpoiler { get; set; }
+
+    public string? WatchedAt { get; set; }
+
+    public string? RatedAt { get; set; }
 }
 
 [ApiController]
@@ -35,6 +61,56 @@ public sealed class CinePersonaController : ControllerBase
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
     private static readonly HttpClient HttpClient = new();
+
+    [HttpGet("Activity")]
+    public async Task<IActionResult> Activity(
+        [FromQuery] string? imdbId,
+        [FromQuery] string? tmdbId,
+        CancellationToken cancellationToken)
+    {
+        var configuration = Plugin.Instance?.Configuration ?? new PluginConfiguration();
+        var apiKey = (configuration.ApiKey ?? string.Empty).Trim();
+        if (apiKey.Length == 0)
+        {
+            return StatusCode(503, new { error = "CinePersona API key is not configured" });
+        }
+
+        imdbId = (imdbId ?? string.Empty).Trim();
+        tmdbId = (tmdbId ?? string.Empty).Trim();
+        if (imdbId.Length == 0 && tmdbId.Length == 0)
+        {
+            return BadRequest(new { error = "IMDb or TMDB ID is required" });
+        }
+
+        var baseUrl = string.IsNullOrWhiteSpace(configuration.ServerUrl)
+            ? "https://cinepersona.com"
+            : configuration.ServerUrl.Trim().TrimEnd('/');
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var serverUri)
+            || (serverUri.Scheme != Uri.UriSchemeHttp && serverUri.Scheme != Uri.UriSchemeHttps))
+        {
+            return StatusCode(503, new { error = "CinePersona server URL is invalid" });
+        }
+
+        var query = "?imdbId=" + Uri.EscapeDataString(imdbId) + "&tmdbId=" + Uri.EscapeDataString(tmdbId);
+        var endpoint = new Uri(serverUri, "/open/v1/movies/lookup/rating" + query);
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Get, endpoint);
+        httpRequest.Headers.Add("X-API-Key", apiKey);
+        httpRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(RequestTimeout);
+        using var response = await HttpClient.SendAsync(httpRequest, timeout.Token).ConfigureAwait(false);
+        var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            return StatusCode((int)response.StatusCode, new { error = "CinePersona activity lookup failed", detail = responseBody });
+        }
+
+        var result = JsonSerializer.Deserialize<CinePersonaActivityResponse>(
+            responseBody,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        return Ok(result ?? new CinePersonaActivityResponse { Success = false });
+    }
 
     [HttpPost("Review")]
     public async Task<IActionResult> Review(
@@ -91,7 +167,8 @@ public sealed class CinePersonaController : ControllerBase
             {
                 Played = true,
                 Rating = request.Rating,
-                Comment = reviewText
+                Comment = reviewText,
+                HasSpoiler = request.HasSpoiler && reviewText.Length > 0
             }
         };
 

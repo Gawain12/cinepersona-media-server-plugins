@@ -27,6 +27,41 @@ namespace Emby.Plugin.CinePersona
         public double Rating { get; set; }
 
         public string ReviewText { get; set; }
+
+        public bool HasSpoiler { get; set; }
+    }
+
+    [Route("/CinePersona/Activity", "GET")]
+    [Authenticated]
+    public class CinePersonaActivityRequest
+    {
+        public string ImdbId { get; set; }
+
+        public string TmdbId { get; set; }
+    }
+
+    public class CinePersonaActivityResponse
+    {
+        public bool Success { get; set; }
+
+        public string MovieId { get; set; }
+
+        public CinePersonaActivity Activity { get; set; }
+    }
+
+    public class CinePersonaActivity
+    {
+        public string Status { get; set; }
+
+        public double? Rating { get; set; }
+
+        public string ReviewText { get; set; }
+
+        public bool HasSpoiler { get; set; }
+
+        public string WatchedAt { get; set; }
+
+        public string RatedAt { get; set; }
     }
 
     public class CinePersonaWebService : IService
@@ -93,7 +128,8 @@ namespace Emby.Plugin.CinePersona
                 {
                     Played = true,
                     Rating = request.Rating,
-                    Comment = reviewText
+                    Comment = reviewText,
+                    HasSpoiler = request.HasSpoiler && reviewText.Length > 0
                 }
             };
 
@@ -122,6 +158,54 @@ namespace Emby.Plugin.CinePersona
             {
                 Success = true
             };
+        }
+
+        public async Task<object> Get(CinePersonaActivityRequest request)
+        {
+            var configuration = Plugin.Instance?.Configuration ?? new PluginConfiguration();
+            var apiKey = (configuration.ApiKey ?? string.Empty).Trim();
+            if (apiKey.Length == 0)
+            {
+                throw new InvalidOperationException("CinePersona API Key 未配置");
+            }
+
+            var imdbId = (request?.ImdbId ?? string.Empty).Trim();
+            var tmdbId = (request?.TmdbId ?? string.Empty).Trim();
+            if (imdbId.Length == 0 && tmdbId.Length == 0)
+            {
+                throw new ArgumentException("必须提供 IMDb 或 TMDB ID");
+            }
+
+            var baseUrl = string.IsNullOrWhiteSpace(configuration.ServerUrl)
+                ? "https://cinepersona.com"
+                : configuration.ServerUrl.Trim().TrimEnd('/');
+            if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var serverUri)
+                || (serverUri.Scheme != Uri.UriSchemeHttp && serverUri.Scheme != Uri.UriSchemeHttps))
+            {
+                throw new InvalidOperationException("CinePersona 服务器地址无效");
+            }
+
+            var query = string.Format(
+                "?imdbId={0}&tmdbId={1}",
+                Uri.EscapeDataString(imdbId),
+                Uri.EscapeDataString(tmdbId));
+            var endpoint = new Uri(serverUri, "/open/v1/movies/lookup/rating" + query);
+            using (var httpRequest = new HttpRequestMessage(HttpMethod.Get, endpoint))
+            {
+                httpRequest.Headers.Add("X-API-Key", apiKey);
+                using (var timeout = new CancellationTokenSource(RequestTimeout))
+                using (var response = await HttpClient.SendAsync(httpRequest, timeout.Token).ConfigureAwait(false))
+                {
+                    var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        throw new InvalidOperationException(
+                            string.Format("CinePersona 返回 HTTP {0}: {1}", (int)response.StatusCode, responseBody));
+                    }
+
+                    return _jsonSerializer.DeserializeFromString<CinePersonaActivityResponse>(responseBody);
+                }
+            }
         }
     }
 }

@@ -15,8 +15,8 @@ CinePersona 的媒体服务器同步插件集合：电影播放完成度达到 8
 - Emby Server 4.7+
 - 仅处理 `Movie`
 - 仅在 `PositionTicks / RunTimeTicks >= 0.8` 时同步
-- 支持 Emby 电影个人评分同步
-- Web 电影详情页提供“评分”入口：可提交评分和短评；已有评分会回显在按钮上
+- 支持 Emby 电影个人评分同步；网页入口会回显 CinePersona 当前评分和短评
+- Web 电影详情页提供“评分”入口：可提交评分、短评和剧透标记
 - 自动携带 TMDB ID、IMDb ID、片名和年份
 - 支持 CinePersona 正式环境和测试环境
 
@@ -26,7 +26,7 @@ CinePersona 的媒体服务器同步插件集合：电影播放完成度达到 8
 
 ## 安装
 
-1. 在 CinePersona 中创建 API Key，并授予 `sync.write` 权限。
+1. 在 CinePersona 中创建 API Key，并授予 `sync.write` 权限；若要使用 CinePersona 评分/短评回显，优先同时授予 `library.read`。
 2. 从 GitHub Releases 下载 `Emby.Plugin.CinePersona.dll`。
 3. 将 DLL 放入 Emby Server 的 `plugins` 目录。
 4. 重启 Emby Server。
