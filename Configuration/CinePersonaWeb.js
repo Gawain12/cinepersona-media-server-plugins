@@ -9,10 +9,10 @@
         }
     } catch (e) {}
 
-    if (window.__cinePersonaWebVersion === "0.2.7") {
+    if (window.__cinePersonaWebVersion === "0.2.8") {
         return;
     }
-    window.__cinePersonaWebVersion = "0.2.7";
+    window.__cinePersonaWebVersion = "0.2.8";
     window.__cinePersonaWebLoaded = true;
 
     var state = {
@@ -252,6 +252,18 @@
         }
     }
 
+    function isVisibleElement(element) {
+        if (!element || !element.getBoundingClientRect) {
+            return false;
+        }
+        var rect = element.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) {
+            return false;
+        }
+        var style = window.getComputedStyle(element);
+        return style.display !== "none" && style.visibility !== "hidden" && style.visibility !== "collapse" && style.opacity !== "0";
+    }
+
     function findDetailButtonBar() {
         var selectors = [
             ".mainDetailButtons",
@@ -260,17 +272,33 @@
             ".detailPagePrimaryContainer .mainDetailButtons",
             ".detailPagePrimaryContainer .detailButtons"
         ];
+        var candidates = [];
         for (var i = 0; i < selectors.length; i++) {
-            var direct = document.querySelector(selectors[i]);
-            if (direct) {
-                return direct;
+            var matches = document.querySelectorAll(selectors[i]);
+            for (var k = 0; k < matches.length; k++) {
+                if (candidates.indexOf(matches[k]) < 0) {
+                    candidates.push(matches[k]);
+                }
             }
         }
 
         var variants = document.querySelectorAll("[class*='mainDetailButtons'],[class*='detailButtons'],[class*='itemDetailButtons']");
         for (var j = 0; j < variants.length; j++) {
-            if (variants[j].querySelector("button,a")) {
-                return variants[j];
+            if (candidates.indexOf(variants[j]) < 0) {
+                candidates.push(variants[j]);
+            }
+        }
+
+        // Emby 保留旧详情页 DOM 时，querySelector 可能先拿到不可见的旧操作栏。
+        // 只允许当前可见的操作栏，避免按钮被注入到上一部电影的隐藏节点。
+        for (var n = 0; n < candidates.length; n++) {
+            if (isVisibleElement(candidates[n]) && candidates[n].querySelector("button,a")) {
+                return candidates[n];
+            }
+        }
+        for (var m = 0; m < candidates.length; m++) {
+            if (isVisibleElement(candidates[m])) {
+                return candidates[m];
             }
         }
         return null;
