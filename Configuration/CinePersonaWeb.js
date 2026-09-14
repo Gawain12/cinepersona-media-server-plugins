@@ -9,10 +9,10 @@
         }
     } catch (e) {}
 
-    if (window.__cinePersonaWebVersion === "0.2.4") {
+    if (window.__cinePersonaWebVersion === "0.2.5") {
         return;
     }
-    window.__cinePersonaWebVersion = "0.2.4";
+    window.__cinePersonaWebVersion = "0.2.5";
     window.__cinePersonaWebLoaded = true;
 
     var state = {
@@ -117,6 +117,19 @@
         return "";
     }
 
+    function cinePersonaWebUrl(item) {
+        var ids = item && item.ProviderIds ? item.ProviderIds : {};
+        var imdbId = providerId(ids, "imdb");
+        var tmdbId = providerId(ids, "tmdb");
+        if (imdbId) {
+            return "https://cinepersona.com/imdb/" + encodeURIComponent(imdbId);
+        }
+        if (tmdbId) {
+            return "https://cinepersona.com/movie/" + encodeURIComponent(tmdbId);
+        }
+        return "";
+    }
+
     function validRating(value) {
         var rating = Number(value);
         return isFinite(rating) && rating >= 0.5 && rating <= 10 ? rating : 0;
@@ -216,7 +229,8 @@
             ".cinepersona-review-spoiler{display:flex;align-items:center;gap:8px;margin:12px 0 0;color:#536173;font-size:13px;line-height:1.4;cursor:pointer}.cinepersona-review-spoiler input{width:16px;height:16px;margin:0;accent-color:#315c9a}" +
             "/* 暗色模式适配 */" +
             "@media (prefers-color-scheme:dark){.cinepersona-detail-button{background:rgba(255,255,255,.14);color:#edf2f8}.cinepersona-detail-button:hover{background:rgba(255,255,255,.25)}.cinepersona-detail-button.is-rated{background:rgba(73,121,182,.46);color:#e5f0ff}.cinepersona-review-card{background:rgba(30,37,48,.98);color:#edf2f8}.cinepersona-review-copy,.cinepersona-review-note,.cinepersona-review-label,.cinepersona-review-spoiler{color:#aab5c4}.cinepersona-review-text{border-color:#465363;background:#232c38;color:#edf2f8}.cinepersona-review-star{color:#667386}.cinepersona-review-star.is-selected,.cinepersona-review-kicker,.cinepersona-review-score{color:#a9c7f2}.cinepersona-review-action{border-color:#8eb2e4;color:#bcd4f2}.cinepersona-review-action.primary{background:#4779b6;color:#fff}}" +
-            "@media (max-width:560px){.cinepersona-detail-button{padding:.5em .8em}.cinepersona-review-card{padding:16px;border-radius:13px}.cinepersona-review-stars{gap:0}.cinepersona-review-star{font-size:23px}}";
+            "@media (max-width:560px){.cinepersona-detail-button{padding:.5em .8em}.cinepersona-review-card{padding:16px;border-radius:13px}.cinepersona-review-stars{gap:0}.cinepersona-review-star{font-size:23px}}" +
+            ".cinepersona-detail-button{height:2.6em;min-height:2.6em;padding:0 .95em;font-size:1em;font-weight:600;line-height:1}.cinepersona-detail-button .cinepersona-btn-icon,.cinepersona-detail-button .cinepersona-btn-label{display:inline-flex;align-items:center;justify-content:center;height:1em;line-height:1;vertical-align:middle}.cinepersona-detail-button .cinepersona-btn-icon{width:1em;margin-right:.45em}.cinepersona-review-actions{align-items:center;flex-wrap:wrap}.cinepersona-review-action{font:650 14px/1.1 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.cinepersona-review-action-link{min-width:0;margin-right:auto;border-color:transparent;padding-left:0;padding-right:0;text-decoration:none;white-space:nowrap}.cinepersona-external-link{color:inherit;text-decoration:none}";
         document.head.appendChild(style);
     }
 
@@ -238,12 +252,71 @@
         }
     }
 
+    function findDetailButtonBar() {
+        var selectors = [
+            ".mainDetailButtons",
+            ".detailButtons",
+            ".itemDetailButtons",
+            ".detailPagePrimaryContainer .mainDetailButtons",
+            ".detailPagePrimaryContainer .detailButtons"
+        ];
+        for (var i = 0; i < selectors.length; i++) {
+            var direct = document.querySelector(selectors[i]);
+            if (direct) {
+                return direct;
+            }
+        }
+
+        var variants = document.querySelectorAll("[class*='mainDetailButtons'],[class*='detailButtons'],[class*='itemDetailButtons']");
+        for (var j = 0; j < variants.length; j++) {
+            if (variants[j].querySelector("button,a")) {
+                return variants[j];
+            }
+        }
+        return null;
+    }
+
+    function injectCinePersonaLink(item) {
+        var url = cinePersonaWebUrl(item);
+        if (!url || document.querySelector(".cinepersona-external-link")) {
+            return;
+        }
+
+        var anchors = document.querySelectorAll("a[href]");
+        var databaseAnchors = [];
+        for (var i = 0; i < anchors.length; i++) {
+            var href = String(anchors[i].href || "").toLowerCase();
+            if (href.indexOf("imdb.com/title/") >= 0 || href.indexOf("themoviedb.org/movie/") >= 0 || href.indexOf("thetvdb.com/dereferrer/movie/") >= 0 || href.indexOf("trakt.tv/search/tmdb/") >= 0) {
+                databaseAnchors.push(anchors[i]);
+            }
+        }
+        if (!databaseAnchors.length) {
+            return;
+        }
+
+        var host = databaseAnchors[0].parentElement;
+        while (host && host.querySelectorAll("a[href]").length < databaseAnchors.length) {
+            host = host.parentElement;
+        }
+        if (!host) {
+            return;
+        }
+
+        var link = makeElement("a", "cinepersona-external-link", "CinePersona");
+        link.href = url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.title = "在 CinePersona 查看评分和短评";
+        host.appendChild(document.createTextNode(", "));
+        host.appendChild(link);
+    }
+
     function injectTriggers() {
         ensureStyles();
         var injectedCount = 0;
 
-        // 1. 注入到主操作栏 (.mainDetailButtons)
-        var btnBar = document.querySelector(".mainDetailButtons") || document.querySelector(".detailButtons");
+        // 1. 注入到主操作栏。不同 Emby 主题/版本使用的容器类名并不完全一致。
+        var btnBar = findDetailButtonBar();
         if (btnBar && !btnBar.querySelector(".cinepersona-detail-button")) {
             var btn = document.createElement("button");
             btn.type = "button";
@@ -252,7 +325,7 @@
             btn.className += rating ? " is-rated" : "";
             btn.title = rating ? "修改 CinePersona 评分（" + formatRating(rating) + "）" : "在 CinePersona 评分并写短评";
             btn.setAttribute("aria-label", btn.title);
-            btn.innerHTML = '<span class="cinepersona-btn-icon">★</span><span>' + formatRating(rating) + '</span>';
+            btn.innerHTML = '<span class="cinepersona-btn-icon">★</span><span class="cinepersona-btn-label">' + formatRating(rating) + '</span>';
             btn.addEventListener("click", openModal);
 
             // 插入在合适的位置（例如如果是评分按钮之前或直接加在主按钮最后）
@@ -264,6 +337,8 @@
             }
             injectedCount++;
         }
+
+        injectCinePersonaLink(state.item);
 
         return injectedCount > 0;
     }
@@ -369,10 +444,20 @@
         spoilerLabel.appendChild(document.createTextNode("这条短评包含剧透"));
         var status = makeElement("p", "cinepersona-review-status");
         var actions = makeElement("div", "cinepersona-review-actions");
+        var webLink = makeElement("a", "cinepersona-review-action cinepersona-review-action-link", "看完整评价");
         var cancel = makeElement("button", "cinepersona-review-action", "取消");
         var submit = makeElement("button", "cinepersona-review-action primary", "保存");
         cancel.type = "button";
         submit.type = "button";
+        var webUrl = cinePersonaWebUrl(state.item);
+        if (webUrl) {
+            webLink.href = webUrl;
+            webLink.target = "_blank";
+            webLink.rel = "noopener noreferrer";
+            webLink.title = "打开 CinePersona 电影页";
+        } else {
+            webLink.style.display = "none";
+        }
         label.htmlFor = "cinepersona-review-text";
 
         renderStars(stars, score);
@@ -412,6 +497,7 @@
             });
         });
 
+        actions.appendChild(webLink);
         actions.appendChild(cancel);
         actions.appendChild(submit);
         card.appendChild(title);
