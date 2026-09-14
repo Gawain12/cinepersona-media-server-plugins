@@ -148,7 +148,7 @@ public sealed class ServerEntryPoint : IHostedService
             IncludeItemTypes = new[] { BaseItemKind.Movie },
             Recursive = true,
             EnableTotalRecordCount = false
-        }).Items;
+        });
         var movieIndex = BuildMovieIndex(movies);
         DateTime? since = null;
         if (!isInitialSync && configuration.LastSyncAt.HasValue)
