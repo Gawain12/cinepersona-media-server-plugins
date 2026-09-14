@@ -92,13 +92,13 @@ namespace Emby.Plugin.CinePersona
                     var positionTicks = runtimeTicks > 0
                         ? runtimeTicks
                         : e.UserData.PlaybackPositionTicks;
-                    await SyncMovieAsync(movie, positionTicks, "手动标记看过", null, e.UserId.ToString()).ConfigureAwait(false);
+                    await SyncMovieAsync(movie, positionTicks, "手动标记看过", null, e.User?.Id.ToString()).ConfigureAwait(false);
                     return;
                 }
 
                 if (e.SaveReason == UserDataSaveReason.UpdateUserRating && e.UserData.Rating.HasValue)
                 {
-                    await SyncMovieAsync(movie, runtimeTicks, "Emby 星级评价", e.UserData.Rating, e.UserId.ToString()).ConfigureAwait(false);
+                    await SyncMovieAsync(movie, runtimeTicks, "Emby 星级评价", e.UserData.Rating, e.User?.Id.ToString()).ConfigureAwait(false);
                 }
             }
             catch (Exception ex)
