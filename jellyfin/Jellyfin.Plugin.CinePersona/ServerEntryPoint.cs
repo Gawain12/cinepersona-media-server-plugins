@@ -5,6 +5,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Jellyfin.Data.Entities;
+using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.CinePersona.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
