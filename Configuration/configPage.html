@@ -68,6 +68,55 @@
         .cinepersonaSaveStatus[data-state="success"] { color: #238653; }
         .cinepersonaSaveStatus[data-state="error"] { color: #b42318; }
 
+        .cinepersonaProfiles {
+            display: grid;
+            gap: 10px;
+            margin: 12px 0 20px;
+        }
+
+        .cinepersonaProfileRow {
+            display: grid;
+            grid-template-columns: minmax(150px, 1fr) minmax(180px, 1.35fr) auto auto;
+            gap: 8px;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid rgba(120, 140, 165, .28);
+            border-radius: 10px;
+            background: rgba(127, 150, 180, .08);
+        }
+
+        .cinepersonaProfileKey {
+            min-width: 0;
+        }
+
+        .cinepersonaProfileEmpty {
+            padding: 12px;
+            border: 1px dashed rgba(120, 140, 165, .42);
+            border-radius: 10px;
+            color: rgba(96, 112, 132, .9);
+        }
+
+        .cinepersonaRemoveProfile {
+            min-width: 0 !important;
+            margin: 0 !important;
+            padding: 8px 10px !important;
+        }
+
+        @media (max-width: 700px) {
+            .cinepersonaProfileRow {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .cinepersonaProfileRow .cinepersonaProfileEnabled {
+                grid-column: 1;
+            }
+
+            .cinepersonaProfileRow .cinepersonaRemoveProfile {
+                grid-column: 2;
+                justify-self: end;
+            }
+        }
+
         @media (max-width: 560px) {
             .cinepersonaHero {
                 grid-template-columns: 48px minmax(0, 1fr) !important;
@@ -97,7 +146,7 @@
 
             <form id="cinepersonaConfigurationForm" class="cinepersonaConfigurationForm">
                 <h2 class="cinepersonaSectionTitle">服务器设置</h2>
-                <p class="cinepersonaSectionCopy">这里管理服务器级选项。每位用户的 CinePersona Key 在自己的电影页面中设置。</p>
+                <p class="cinepersonaSectionCopy">管理员在这里为服务器用户配置 CinePersona Key。配置完成后，普通用户直接使用 Emby 即可同步。</p>
 
                 <div class="inputContainer">
                     <label class="inputLabel" for="txtServerUrl">CinePersona 地址</label>
@@ -109,6 +158,11 @@
                     <input is="emby-checkbox" type="checkbox" id="chkReverseSync" />
                     <span>启用 CinePersona → Emby 定期同步（每 6 小时）</span>
                 </label>
+
+                <h2 class="cinepersonaSectionTitle">用户连接</h2>
+                <p class="cinepersonaSectionCopy">每个用户使用自己的 CinePersona 账号。API Key 只保存在插件配置中，不会出现在电影页面。</p>
+                <div id="cinepersonaProfiles" class="cinepersonaProfiles"></div>
+                <button is="emby-button" type="button" class="button-submit" id="btnAddProfile">添加用户</button>
 
                 <button is="emby-button" type="submit" class="raised button-submit block" id="btnSave">保存设置</button>
                 <div id="cinepersonaSaveStatus" class="cinepersonaSaveStatus" role="status" aria-live="polite"></div>

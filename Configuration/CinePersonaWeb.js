@@ -9,10 +9,10 @@
         }
     } catch (e) {}
 
-    if (window.__cinePersonaWebVersion === "0.2.9") {
+    if (window.__cinePersonaWebVersion === "0.2.10") {
         return;
     }
-    window.__cinePersonaWebVersion = "0.2.9";
+    window.__cinePersonaWebVersion = "0.2.10";
     window.__cinePersonaWebLoaded = true;
 
     var state = {
