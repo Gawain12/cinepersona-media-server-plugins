@@ -9,10 +9,10 @@
         }
     } catch (e) {}
 
-    if (window.__cinePersonaWebVersion === "0.2.5") {
+    if (window.__cinePersonaWebVersion === "0.2.6") {
         return;
     }
-    window.__cinePersonaWebVersion = "0.2.5";
+    window.__cinePersonaWebVersion = "0.2.6";
     window.__cinePersonaWebLoaded = true;
 
     var state = {
@@ -578,9 +578,50 @@
         });
     }
 
+    function scheduleRefresh() {
+        if (state.refreshScheduled) {
+            return;
+        }
+        state.refreshScheduled = true;
+        window.setTimeout(function () {
+            state.refreshScheduled = false;
+            refresh();
+        }, 120);
+    }
+
+    function installNavigationWatchers() {
+        if (!window.__cinePersonaNavigationWatchers) {
+            ["pushState", "replaceState"].forEach(function (methodName) {
+                var original = window.history[methodName];
+                if (typeof original !== "function") {
+                    return;
+                }
+                window.history[methodName] = function () {
+                    var result = original.apply(this, arguments);
+                    scheduleRefresh();
+                    return result;
+                };
+            });
+            window.__cinePersonaNavigationWatchers = true;
+        }
+
+        window.addEventListener("hashchange", scheduleRefresh);
+        window.addEventListener("popstate", scheduleRefresh);
+        if (window.MutationObserver && document.body) {
+            var observer = new MutationObserver(function (mutations) {
+                for (var i = 0; i < mutations.length; i++) {
+                    if (mutations[i].type === "childList") {
+                        scheduleRefresh();
+                        return;
+                    }
+                }
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        }
+    }
+
     ensureStyles();
-    window.addEventListener("hashchange", refresh);
-    window.addEventListener("popstate", refresh);
+    installNavigationWatchers();
     window.setInterval(refresh, 1000);
     refresh();
 })();
