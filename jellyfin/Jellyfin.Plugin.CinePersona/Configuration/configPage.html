@@ -23,6 +23,17 @@
                     <div class="fieldDescription">测试环境可填写 https://test.gawyn.de</div>
                 </div>
 
+                <div class="inputContainer">
+                    <label class="inputLabel" for="txtSyncUserId">同步到哪个 Jellyfin 用户:</label>
+                    <input is="emby-input" type="text" id="txtSyncUserId" name="txtSyncUserId" autocomplete="off" />
+                    <div class="fieldDescription">默认填入当前登录用户。首次同步会把 CinePersona 的已看电影补到这个用户。</div>
+                </div>
+
+                <label class="checkboxContainer">
+                    <input is="emby-checkbox" type="checkbox" id="chkReverseSync" />
+                    <span>启用 CinePersona → Jellyfin 定期同步（每 6 小时）</span>
+                </label>
+
                 <button is="emby-button" type="submit" class="raised button-submit block">保存</button>
             </form>
         </div>
@@ -37,6 +48,8 @@
                 ApiClient.getPluginConfiguration(CinePersonaConfig.pluginUniqueId).then(function (config) {
                     $('#txtApiKey', form).val(config.ApiKey || '');
                     $('#txtServerUrl', form).val(config.ServerUrl || 'https://cinepersona.com');
+                    $('#txtSyncUserId', form).val(config.SyncUserId || (ApiClient.getCurrentUserId ? ApiClient.getCurrentUserId() : ''));
+                    $('#chkReverseSync', form).prop('checked', config.ReverseSyncEnabled !== false);
                 });
             });
 
@@ -45,6 +58,8 @@
                 ApiClient.getPluginConfiguration(CinePersonaConfig.pluginUniqueId).then(function (config) {
                     config.ApiKey = $('#txtApiKey', form).val();
                     config.ServerUrl = $('#txtServerUrl', form).val();
+                    config.SyncUserId = $('#txtSyncUserId', form).val().trim();
+                    config.ReverseSyncEnabled = $('#chkReverseSync', form).prop('checked');
                     ApiClient.updatePluginConfiguration(CinePersonaConfig.pluginUniqueId, config).then(function (result) {
                         Dashboard.processPluginConfigurationUpdateResult(result);
                     });

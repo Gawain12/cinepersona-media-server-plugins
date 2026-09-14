@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Emby.Plugin.CinePersona.Configuration;
+using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Plugins;
@@ -17,22 +20,33 @@ namespace Emby.Plugin.CinePersona
     public class ServerEntryPoint : IServerEntryPoint
     {
         private const double CompletionThreshold = 0.80d;
+        private static readonly TimeSpan ReverseSyncInterval = TimeSpan.FromHours(6);
+        private static readonly TimeSpan ReverseSyncInitialDelay = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan ReverseSyncPollInterval = TimeSpan.FromMinutes(5);
         private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
         private static readonly HttpClient HttpClient = new HttpClient();
 
         private readonly ISessionManager _sessionManager;
         private readonly IUserDataManager _userDataManager;
+        private readonly IUserManager _userManager;
+        private readonly ILibraryManager _libraryManager;
         private readonly ILogger _logger;
         private readonly IJsonSerializer _jsonSerializer;
+        private readonly SemaphoreSlim _reverseSyncLock = new SemaphoreSlim(1, 1);
+        private Timer _reverseSyncTimer;
 
         public ServerEntryPoint(
             ISessionManager sessionManager,
             IUserDataManager userDataManager,
+            IUserManager userManager,
+            ILibraryManager libraryManager,
             ILogManager logManager,
             IJsonSerializer jsonSerializer)
         {
             _sessionManager = sessionManager;
             _userDataManager = userDataManager;
+            _userManager = userManager;
+            _libraryManager = libraryManager;
             _logger = logManager.GetLogger("CinePersona");
             _jsonSerializer = jsonSerializer;
         }
@@ -41,6 +55,11 @@ namespace Emby.Plugin.CinePersona
         {
             _sessionManager.PlaybackStopped += OnPlaybackStopped;
             _userDataManager.UserDataSaved += OnUserDataSaved;
+            _reverseSyncTimer = new Timer(
+                _ => _ = RunReverseSyncSafelyAsync(),
+                null,
+                ReverseSyncInitialDelay,
+                ReverseSyncPollInterval);
         }
 
         private async void OnPlaybackStopped(object sender, PlaybackStopEventArgs e)
@@ -96,6 +115,295 @@ namespace Emby.Plugin.CinePersona
             }
 
             await SyncMovieAsync(movie, e.PlaybackPositionTicks ?? 0, "播放完成", null).ConfigureAwait(false);
+        }
+
+        private async Task RunReverseSyncSafelyAsync()
+        {
+            if (!await _reverseSyncLock.WaitAsync(0).ConfigureAwait(false))
+            {
+                return;
+            }
+
+            try
+            {
+                await PullAndApplyReverseSyncAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.ErrorException("CinePersona 反向同步失败", ex);
+            }
+            finally
+            {
+                _reverseSyncLock.Release();
+            }
+        }
+
+        private async Task PullAndApplyReverseSyncAsync()
+        {
+            var plugin = Plugin.Instance;
+            var configuration = plugin?.Configuration;
+            if (configuration == null || !configuration.ReverseSyncEnabled)
+            {
+                return;
+            }
+
+            var apiKey = (configuration.ApiKey ?? string.Empty).Trim();
+            var syncUserId = (configuration.SyncUserId ?? string.Empty).Trim();
+            if (apiKey.Length == 0 || syncUserId.Length == 0)
+            {
+                return;
+            }
+
+            if (!Guid.TryParse(syncUserId, out var userId))
+            {
+                _logger.Warn("CinePersona 反向同步用户 ID 无效");
+                return;
+            }
+
+            var isInitialSync = !configuration.InitialSyncCompleted
+                || !string.Equals(configuration.LastSyncUserId, syncUserId, StringComparison.OrdinalIgnoreCase);
+            var now = DateTime.UtcNow;
+            if (!isInitialSync
+                && configuration.LastSyncAt.HasValue
+                && now - configuration.LastSyncAt.Value.ToUniversalTime() < ReverseSyncInterval)
+            {
+                return;
+            }
+
+            var user = _userManager.GetUserById(userId);
+            if (user == null)
+            {
+                _logger.Warn($"CinePersona 反向同步找不到 Emby 用户: {syncUserId}");
+                return;
+            }
+
+            var movies = _libraryManager.GetItemList(new InternalItemsQuery
+            {
+                IncludeItemTypes = new[] { BaseItemKind.Movie },
+                Recursive = true,
+                EnableTotalRecordCount = false
+            }).Items;
+            var movieIndex = BuildMovieIndex(movies);
+            DateTime? since = null;
+            if (!isInitialSync && configuration.LastSyncAt.HasValue)
+            {
+                since = configuration.LastSyncAt.Value.ToUniversalTime().AddMinutes(-5);
+            }
+
+            var offset = 0;
+            var imported = 0;
+            var matched = 0;
+            for (var pageNumber = 0; pageNumber < 100; pageNumber++)
+            {
+                var page = await FetchSyncPageAsync(configuration, apiKey, since, offset).ConfigureAwait(false);
+                var activities = page.Activities ?? new SyncActivity[0];
+                foreach (var activity in activities)
+                {
+                    imported++;
+                    if (ApplySyncActivity(userId, activity, movieIndex))
+                    {
+                        matched++;
+                    }
+                }
+
+                if (page.Paging == null || !page.Paging.HasMore || activities.Length == 0)
+                {
+                    break;
+                }
+
+                offset += activities.Length;
+                if (pageNumber == 99)
+                {
+                    throw new InvalidOperationException("CinePersona 反向同步超过 100 页，已中止");
+                }
+            }
+
+            configuration.InitialSyncCompleted = true;
+            configuration.LastSyncAt = now;
+            configuration.LastSyncUserId = syncUserId;
+            plugin.SaveConfiguration();
+            _logger.Info($"CinePersona 反向同步完成: {imported} 条记录，匹配本地电影 {matched} 条");
+        }
+
+        private async Task<SyncPullResponse> FetchSyncPageAsync(
+            PluginConfiguration configuration,
+            string apiKey,
+            DateTime? since,
+            int offset)
+        {
+            var baseUrl = string.IsNullOrWhiteSpace(configuration.ServerUrl)
+                ? "https://cinepersona.com"
+                : configuration.ServerUrl.Trim().TrimEnd('/');
+            if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var serverUri)
+                || (serverUri.Scheme != Uri.UriSchemeHttp && serverUri.Scheme != Uri.UriSchemeHttps))
+            {
+                throw new InvalidOperationException("CinePersona 服务器地址无效");
+            }
+
+            var query = "?limit=200&offset=" + offset.ToString(CultureInfo.InvariantCulture);
+            if (since.HasValue)
+            {
+                var sinceText = since.Value.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+                query += "&since=" + Uri.EscapeDataString(sinceText);
+            }
+
+            var endpoint = new Uri(serverUri, "/open/v1/sync" + query);
+            using (var request = new HttpRequestMessage(HttpMethod.Get, endpoint))
+            {
+                request.Headers.Add("X-API-Key", apiKey);
+                using (var timeout = new CancellationTokenSource(RequestTimeout))
+                using (var response = await HttpClient.SendAsync(request, timeout.Token).ConfigureAwait(false))
+                {
+                    var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        throw new InvalidOperationException($"CinePersona 反向同步接口返回 {(int)response.StatusCode}: {responseBody}");
+                    }
+
+                    var result = _jsonSerializer.DeserializeFromString<SyncPullResponse>(responseBody);
+                    if (result == null || !result.Success)
+                    {
+                        throw new InvalidOperationException("CinePersona 反向同步接口返回无效数据");
+                    }
+
+                    return result;
+                }
+            }
+        }
+
+        private bool ApplySyncActivity(Guid userId, SyncActivity activity, IDictionary<string, Movie> movieIndex)
+        {
+            if (activity == null || activity.Movie == null)
+            {
+                return false;
+            }
+
+            var movie = FindMovie(activity.Movie, movieIndex);
+            if (movie == null)
+            {
+                return false;
+            }
+
+            var userData = _userDataManager.GetUserData(userId, movie);
+            var changed = false;
+            if (!userData.Played)
+            {
+                userData.Played = true;
+                userData.PlayCount = Math.Max(userData.PlayCount, 1);
+                userData.PlaybackPositionTicks = movie.RunTimeTicks ?? userData.PlaybackPositionTicks;
+                if (!userData.LastPlayedDate.HasValue && TryParseDate(activity.WatchedAt, out var watchedAt))
+                {
+                    userData.LastPlayedDate = watchedAt;
+                }
+                changed = true;
+            }
+
+            if ((!userData.Rating.HasValue || userData.Rating.Value <= 0)
+                && activity.Rating.HasValue
+                && activity.Rating.Value > 0)
+            {
+                userData.Rating = activity.Rating.Value;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                _userDataManager.SaveUserData(userId, movie, userData, UserDataSaveReason.Import, CancellationToken.None);
+            }
+
+            return true;
+        }
+
+        private static IDictionary<string, Movie> BuildMovieIndex(IEnumerable<BaseItem> items)
+        {
+            var index = new Dictionary<string, Movie>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in items)
+            {
+                if (!(item is Movie movie))
+                {
+                    continue;
+                }
+
+                AddMovieKey(index, "imdb:", movie.ProviderIds, "Imdb", movie);
+                AddMovieKey(index, "tmdb:", movie.ProviderIds, "Tmdb", movie);
+            }
+
+            return index;
+        }
+
+        private static void AddMovieKey(
+            IDictionary<string, Movie> index,
+            string prefix,
+            IDictionary<string, string> providerIds,
+            string provider,
+            Movie movie)
+        {
+            if (providerIds != null && providerIds.TryGetValue(provider, out var value) && !string.IsNullOrWhiteSpace(value))
+            {
+                var key = prefix + value.Trim();
+                if (!index.ContainsKey(key))
+                {
+                    index[key] = movie;
+                }
+            }
+        }
+
+        private static Movie FindMovie(SyncMovie movie, IDictionary<string, Movie> movieIndex)
+        {
+            if (!string.IsNullOrWhiteSpace(movie.ImdbId)
+                && movieIndex.TryGetValue("imdb:" + movie.ImdbId.Trim(), out var byImdb))
+            {
+                return byImdb;
+            }
+
+            if (movie.TmdbId.HasValue
+                && movieIndex.TryGetValue("tmdb:" + movie.TmdbId.Value.ToString(CultureInfo.InvariantCulture), out var byTmdb))
+            {
+                return byTmdb;
+            }
+
+            return null;
+        }
+
+        private static bool TryParseDate(string value, out DateTime parsed)
+        {
+            return DateTime.TryParse(
+                value,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out parsed);
+        }
+
+        private sealed class SyncPullResponse
+        {
+            public bool Success { get; set; }
+
+            public SyncPaging Paging { get; set; } = new SyncPaging();
+
+            public SyncActivity[] Activities { get; set; }
+        }
+
+        private sealed class SyncPaging
+        {
+            public bool HasMore { get; set; }
+        }
+
+        private sealed class SyncActivity
+        {
+            public string Status { get; set; }
+
+            public double? Rating { get; set; }
+
+            public string WatchedAt { get; set; }
+
+            public SyncMovie Movie { get; set; }
+        }
+
+        private sealed class SyncMovie
+        {
+            public int? TmdbId { get; set; }
+
+            public string ImdbId { get; set; }
         }
 
         private async Task SyncMovieAsync(Movie movie, long positionTicks, string trigger, double? rating)
@@ -202,6 +510,7 @@ namespace Emby.Plugin.CinePersona
 
         public void Dispose()
         {
+            _reverseSyncTimer?.Dispose();
             _sessionManager.PlaybackStopped -= OnPlaybackStopped;
             _userDataManager.UserDataSaved -= OnUserDataSaved;
         }

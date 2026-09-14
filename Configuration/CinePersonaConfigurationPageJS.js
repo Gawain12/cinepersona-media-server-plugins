@@ -4,6 +4,8 @@ define([], function () {
         var form;
         var apiKeyInput;
         var serverUrlInput;
+        var syncUserIdInput;
+        var reverseSyncInput;
         var saveButton;
         var status;
         var initialized = false;
@@ -16,6 +18,8 @@ define([], function () {
             form = page.querySelector("#cinepersonaConfigurationForm");
             apiKeyInput = page.querySelector("#txtApiKey");
             serverUrlInput = page.querySelector("#txtServerUrl");
+            syncUserIdInput = page.querySelector("#txtSyncUserId");
+            reverseSyncInput = page.querySelector("#chkReverseSync");
             saveButton = page.querySelector("#btnSave");
             status = page.querySelector("#cinepersonaSaveStatus");
 
@@ -45,6 +49,12 @@ define([], function () {
             ApiClient.getPluginConfiguration(pluginUniqueId).then(function (config) {
                 apiKeyInput.value = "";
                 serverUrlInput.value = config.ServerUrl || "https://cinepersona.com";
+                if (syncUserIdInput) {
+                    syncUserIdInput.value = config.SyncUserId || (ApiClient.getCurrentUserId ? ApiClient.getCurrentUserId() : "");
+                }
+                if (reverseSyncInput) {
+                    reverseSyncInput.checked = config.ReverseSyncEnabled !== false;
+                }
             }).catch(function (error) {
                 console.error("CinePersona 配置读取失败", error);
                 setStatus("读取配置失败，请刷新后重试。", "error");
@@ -75,6 +85,12 @@ define([], function () {
                     throw new Error("API Key 不能为空");
                 }
                 config.ServerUrl = serverUrlInput.value;
+                if (syncUserIdInput) {
+                    config.SyncUserId = syncUserIdInput.value.trim();
+                }
+                if (reverseSyncInput) {
+                    config.ReverseSyncEnabled = reverseSyncInput.checked;
+                }
                 return ApiClient.updatePluginConfiguration(pluginUniqueId, config);
             }).then(function () {
                 setStatus("已保存，插件会使用新配置。", "success");
