@@ -179,7 +179,7 @@ namespace Emby.Plugin.CinePersona
 
             var movies = _libraryManager.GetItemList(new InternalItemsQuery
             {
-                IncludeItemTypes = new[] { BaseItemKind.Movie },
+                IncludeItemTypes = new[] { "Movie" },
                 Recursive = true,
                 EnableTotalRecordCount = false
             }).Items;
@@ -200,7 +200,7 @@ namespace Emby.Plugin.CinePersona
                 foreach (var activity in activities)
                 {
                     imported++;
-                    if (ApplySyncActivity(userId, activity, movieIndex))
+                    if (ApplySyncActivity(user, activity, movieIndex))
                     {
                         matched++;
                     }
@@ -271,7 +271,7 @@ namespace Emby.Plugin.CinePersona
             }
         }
 
-        private bool ApplySyncActivity(Guid userId, SyncActivity activity, IDictionary<string, Movie> movieIndex)
+        private bool ApplySyncActivity(User user, SyncActivity activity, IDictionary<string, Movie> movieIndex)
         {
             if (activity == null || activity.Movie == null)
             {
@@ -284,7 +284,7 @@ namespace Emby.Plugin.CinePersona
                 return false;
             }
 
-            var userData = _userDataManager.GetUserData(userId, movie);
+            var userData = _userDataManager.GetUserData(user, movie);
             var changed = false;
             if (!userData.Played)
             {
@@ -308,7 +308,7 @@ namespace Emby.Plugin.CinePersona
 
             if (changed)
             {
-                _userDataManager.SaveUserData(userId, movie, userData, UserDataSaveReason.Import, CancellationToken.None);
+                _userDataManager.SaveUserData(user, movie, userData, UserDataSaveReason.Import, CancellationToken.None);
             }
 
             return true;
