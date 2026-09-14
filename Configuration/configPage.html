@@ -145,13 +145,11 @@
             </section>
 
             <form id="cinepersonaConfigurationForm" class="cinepersonaConfigurationForm">
-                <h2 class="cinepersonaSectionTitle">服务器设置</h2>
-                <p class="cinepersonaSectionCopy">管理员在这里为服务器用户配置 CinePersona Key。配置完成后，普通用户直接使用 Emby 即可同步。</p>
-
+                <h2 class="cinepersonaSectionTitle">主账号</h2>
                 <div class="inputContainer">
-                    <label class="inputLabel" for="txtServerUrl">CinePersona 地址</label>
-                    <input is="emby-input" type="url" id="txtServerUrl" name="txtServerUrl" value="https://cinepersona.com" required />
-                    <div class="fieldDescription">正式环境：<span class="cinepersonaHint">https://cinepersona.com</span>　测试环境：https://test.gawyn.de</div>
+                    <label class="inputLabel" for="txtApiKey">CinePersona API Key</label>
+                    <input is="emby-input" type="password" id="txtApiKey" name="txtApiKey" autocomplete="new-password" placeholder="cpk_…" />
+                    <div class="fieldDescription"><a href="https://cinepersona.com/settings" target="_blank" rel="noopener noreferrer">获取 API Key ↗</a></div>
                 </div>
 
                 <label class="checkboxContainer">
@@ -159,8 +157,7 @@
                     <span>启用 CinePersona → Emby 定期同步（每 6 小时）</span>
                 </label>
 
-                <h2 class="cinepersonaSectionTitle">用户连接</h2>
-                <p class="cinepersonaSectionCopy">每个用户使用自己的 CinePersona 账号。API Key 只保存在插件配置中，不会出现在电影页面。</p>
+                <h2 class="cinepersonaSectionTitle">其他用户</h2>
                 <div id="cinepersonaProfiles" class="cinepersonaProfiles"></div>
                 <button is="emby-button" type="button" class="button-submit" id="btnAddProfile">添加用户</button>
 

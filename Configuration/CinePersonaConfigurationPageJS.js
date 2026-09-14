@@ -2,7 +2,7 @@ define([], function () {
     return function (page) {
         var pluginUniqueId = "f62e8471-469b-43d8-b57f-f4a4d7d10001";
         var form;
-        var serverUrlInput;
+        var mainApiKeyInput;
         var reverseSyncInput;
         var profilesContainer;
         var addProfileButton;
@@ -17,14 +17,14 @@ define([], function () {
             }
 
             form = page.querySelector("#cinepersonaConfigurationForm");
-            serverUrlInput = page.querySelector("#txtServerUrl");
+            mainApiKeyInput = page.querySelector("#txtApiKey");
             reverseSyncInput = page.querySelector("#chkReverseSync");
             profilesContainer = page.querySelector("#cinepersonaProfiles");
             addProfileButton = page.querySelector("#btnAddProfile");
             saveButton = page.querySelector("#btnSave");
             status = page.querySelector("#cinepersonaSaveStatus");
 
-            if (!form || !serverUrlInput) {
+            if (!form || !mainApiKeyInput || !profilesContainer) {
                 return;
             }
 
@@ -69,6 +69,13 @@ define([], function () {
             return user && (user.Name || user.name) ? String(user.Name || user.name) : "未命名用户";
         }
 
+        function currentUserId() {
+            if (window.ApiClient && typeof ApiClient.getCurrentUserId === "function") {
+                return ApiClient.getCurrentUserId() || "";
+            }
+            return "";
+        }
+
         function normalizedProfiles(config) {
             var profiles = Array.isArray(config.UserProfiles) ? config.UserProfiles.slice() : [];
             if (config.ApiKey && config.SyncUserId && !profiles.some(function (profile) {
@@ -83,6 +90,13 @@ define([], function () {
                 });
             }
             return profiles;
+        }
+
+        function findProfile(profiles, userIdValue) {
+            var normalizedId = String(userIdValue || "").toLowerCase();
+            return (profiles || []).find(function (profile) {
+                return profile && String(profile.UserId || profile.userId || "").toLowerCase() === normalizedId;
+            });
         }
 
         function createElement(tagName, className, text) {
@@ -213,18 +227,26 @@ define([], function () {
         }
 
         function load() {
-            if (!serverUrlInput) {
+            if (!mainApiKeyInput) {
                 return;
             }
 
             Promise.all([ApiClient.getPluginConfiguration(pluginUniqueId), getUsers()]).then(function (values) {
                 var config = values[0] || {};
                 mediaUsers = values[1] || [];
-                serverUrlInput.value = config.ServerUrl || "https://cinepersona.com";
+                var profiles = normalizedProfiles(config);
+                var mainUserId = currentUserId() || config.SyncUserId || "";
+                var mainProfile = findProfile(profiles, mainUserId);
+                var existingKey = mainProfile && (mainProfile.ApiKey || mainProfile.apiKey) ? (mainProfile.ApiKey || mainProfile.apiKey) : (config.ApiKey || "");
+                mainApiKeyInput.value = "";
+                mainApiKeyInput.placeholder = existingKey ? "已配置，留空保持不变" : "cpk_…";
+                mainApiKeyInput.setAttribute("data-existing-key", existingKey);
                 if (reverseSyncInput) {
                     reverseSyncInput.checked = config.ReverseSyncEnabled !== false;
                 }
-                renderProfiles(normalizedProfiles(config));
+                renderProfiles(profiles.filter(function (profile) {
+                    return !mainUserId || String(profile.UserId || profile.userId || "").toLowerCase() !== mainUserId.toLowerCase();
+                }));
             }).catch(function (error) {
                 console.error("CinePersona 配置读取失败", error);
                 setStatus("读取配置失败，请刷新后重试。", "error");
@@ -237,7 +259,7 @@ define([], function () {
                 event.stopPropagation();
             }
 
-            if (!serverUrlInput) {
+            if (!mainApiKeyInput) {
                 return false;
             }
 
@@ -247,17 +269,30 @@ define([], function () {
             setStatus("正在保存…", "saving");
 
             ApiClient.getPluginConfiguration(pluginUniqueId).then(function (config) {
-                config.ServerUrl = serverUrlInput.value;
+                var mainKey = String(mainApiKeyInput.value || "").trim() || mainApiKeyInput.getAttribute("data-existing-key") || "";
+                var mainUserId = currentUserId() || config.SyncUserId || "";
+                if (!mainKey) {
+                    throw new Error("请填写主账号 API Key。");
+                }
+                if (!mainUserId) {
+                    throw new Error("无法识别当前管理员账号，请刷新页面后重试。");
+                }
                 if (reverseSyncInput) {
                     config.ReverseSyncEnabled = reverseSyncInput.checked;
                 }
-                config.UserProfiles = collectProfiles();
+                var profiles = collectProfiles().filter(function (profile) {
+                    return String(profile.UserId || "").toLowerCase() !== mainUserId.toLowerCase();
+                });
+                profiles.push({ UserId: mainUserId, ApiKey: mainKey, Enabled: true });
+                config.ApiKey = mainKey;
+                config.SyncUserId = mainUserId;
+                config.UserProfiles = profiles;
                 return ApiClient.updatePluginConfiguration(pluginUniqueId, config);
             }).then(function () {
                 setStatus("已保存，插件会使用新配置。", "success");
             }).catch(function (error) {
                 console.error("CinePersona 配置保存失败", error);
-                setStatus("保存失败，请检查 CinePersona 地址后重试。", "error");
+                setStatus(error && error.message ? error.message : "保存失败，请检查配置后重试。", "error");
             }).then(function () {
                 if (saveButton) {
                     saveButton.disabled = false;

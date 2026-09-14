@@ -9,10 +9,10 @@
         }
     } catch (e) {}
 
-    if (window.__cinePersonaWebVersion === "0.2.10") {
+    if (window.__cinePersonaWebVersion === "0.2.11") {
         return;
     }
-    window.__cinePersonaWebVersion = "0.2.10";
+    window.__cinePersonaWebVersion = "0.2.11";
     window.__cinePersonaWebLoaded = true;
 
     var state = {
@@ -476,9 +476,13 @@
         var copy = makeElement("p", "cinepersona-review-copy", "当前 Emby 用户单独保存自己的观影记录和评分。");
         var label = makeElement("label", "cinepersona-review-label", "API Key");
         var input = makeElement("input", "cinepersona-review-text");
+        var keyLink = makeElement("a", "cinepersona-review-note", "获取 API Key ↗");
         input.type = "password";
         input.autocomplete = "off";
         input.placeholder = settings.Configured ? "已配置，留空保持不变" : "cpk_…";
+        keyLink.href = "https://cinepersona.com/settings";
+        keyLink.target = "_blank";
+        keyLink.rel = "noopener noreferrer";
         var enabledLabel = makeElement("label", "cinepersona-review-spoiler");
         var enabledInput = document.createElement("input");
         enabledInput.type = "checkbox";
@@ -531,6 +535,7 @@
         card.appendChild(copy);
         card.appendChild(label);
         card.appendChild(input);
+        card.appendChild(keyLink);
         card.appendChild(enabledLabel);
         card.appendChild(status);
         card.appendChild(actions);
