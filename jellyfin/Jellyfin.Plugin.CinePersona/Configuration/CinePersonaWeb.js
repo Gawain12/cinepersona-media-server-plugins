@@ -310,6 +310,17 @@
         host.appendChild(link);
     }
 
+    function removeCinePersonaLinks() {
+        var links = document.querySelectorAll(".cinepersona-external-link");
+        for (var i = 0; i < links.length; i++) {
+            var separator = links[i].previousSibling;
+            if (separator && separator.nodeType === 3 && separator.nodeValue === ", ") {
+                separator.remove();
+            }
+            links[i].remove();
+        }
+    }
+
     function injectTriggers() {
         ensureStyles();
         var injectedCount = 0;
@@ -522,6 +533,7 @@
     function refresh() {
         var itemId = currentItemId();
         if (!itemId) {
+            removeCinePersonaLinks();
             state.itemId = null;
             state.item = null;
             state.activity = null;
@@ -536,6 +548,7 @@
         state.itemId = itemId;
         state.item = null;
         state.activity = null;
+        removeCinePersonaLinks();
         setTriggerVisible(false);
         getItem(itemId).then(function (item) {
             if (state.itemId !== itemId) {
