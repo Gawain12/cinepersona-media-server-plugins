@@ -47,6 +47,24 @@ public sealed class CinePersonaSettingsSaveRequest
     public bool Enabled { get; set; } = true;
 }
 
+public sealed class CinePersonaDevicePollRequest
+{
+    public string? DeviceCode { get; set; }
+}
+
+public sealed class DevicePollResult
+{
+    public bool Success { get; set; }
+
+    public string? Status { get; set; }
+
+    public string? ApiKey { get; set; }
+
+    public string? UserId { get; set; }
+
+    public string? UserName { get; set; }
+}
+
 public sealed class CinePersonaActivity
 {
     public string? Status { get; set; }
@@ -131,6 +149,110 @@ public sealed class CinePersonaController : ControllerBase
             enabled = profile.Enabled,
             userId
         });
+    }
+
+    [HttpPost("DeviceCode")]
+    public async Task<IActionResult> DeviceCode(CancellationToken cancellationToken)
+    {
+        var configuration = Plugin.Instance?.Configuration ?? new PluginConfiguration();
+        var baseUrl = string.IsNullOrWhiteSpace(configuration.ServerUrl)
+            ? "https://cinepersona.com"
+            : configuration.ServerUrl.Trim().TrimEnd('/');
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var serverUri)
+            || (serverUri.Scheme != Uri.UriSchemeHttp && serverUri.Scheme != Uri.UriSchemeHttps))
+        {
+            return StatusCode(503, new { error = "CinePersona server URL is invalid" });
+        }
+
+        var endpoint = new Uri(serverUri, "/open/v1/device/code");
+        var payload = new { clientName = "Jellyfin" };
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint);
+        httpRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        httpRequest.Content = new StringContent(
+            JsonSerializer.Serialize(payload),
+            Encoding.UTF8,
+            "application/json");
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(RequestTimeout);
+        using var response = await HttpClient.SendAsync(httpRequest, timeout.Token).ConfigureAwait(false);
+        var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            return StatusCode((int)response.StatusCode, new { error = "Failed to request device code", detail = responseBody });
+        }
+
+        return Content(responseBody, "application/json");
+    }
+
+    [HttpPost("DevicePoll")]
+    public async Task<IActionResult> DevicePoll(
+        [FromBody] CinePersonaDevicePollRequest request,
+        CancellationToken cancellationToken)
+    {
+        var plugin = Plugin.Instance;
+        var configuration = plugin?.Configuration ?? new PluginConfiguration();
+        var userId = GetCurrentUserId();
+        if (userId.Length == 0)
+        {
+            return Unauthorized(new { error = "Unable to identify the current Jellyfin user" });
+        }
+
+        var deviceCode = (request?.DeviceCode ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(deviceCode))
+        {
+            return BadRequest(new { error = "deviceCode is required" });
+        }
+
+        var baseUrl = string.IsNullOrWhiteSpace(configuration.ServerUrl)
+            ? "https://cinepersona.com"
+            : configuration.ServerUrl.Trim().TrimEnd('/');
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var serverUri)
+            || (serverUri.Scheme != Uri.UriSchemeHttp && serverUri.Scheme != Uri.UriSchemeHttps))
+        {
+            return StatusCode(503, new { error = "CinePersona server URL is invalid" });
+        }
+
+        var endpoint = new Uri(serverUri, "/open/v1/device/poll");
+        var payload = new { deviceCode };
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint);
+        httpRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        httpRequest.Content = new StringContent(
+            JsonSerializer.Serialize(payload),
+            Encoding.UTF8,
+            "application/json");
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(RequestTimeout);
+        using var response = await HttpClient.SendAsync(httpRequest, timeout.Token).ConfigureAwait(false);
+        var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            return StatusCode((int)response.StatusCode, new { error = "Failed to poll device status", detail = responseBody });
+        }
+
+        try
+        {
+            var pollResult = JsonSerializer.Deserialize<DevicePollResult>(
+                responseBody,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (pollResult is not null && pollResult.Success && string.Equals(pollResult.Status, "approved", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(pollResult.ApiKey))
+            {
+                var profile = configuration.GetOrCreateUserProfile(userId);
+                if (profile is not null)
+                {
+                    profile.ApiKey = pollResult.ApiKey.Trim();
+                    profile.Enabled = true;
+                    plugin?.SaveConfiguration();
+                }
+            }
+        }
+        catch
+        {
+            // Ignore parse exceptions on pending/failed states
+        }
+
+        return Content(responseBody, "application/json");
     }
 
     [HttpGet("Activity")]

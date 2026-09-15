@@ -56,6 +56,32 @@ namespace Emby.Plugin.CinePersona
         public bool Enabled { get; set; } = true;
     }
 
+    [Route("/CinePersona/DeviceCode", "POST")]
+    [Authenticated]
+    public class CinePersonaDeviceCodeRequest
+    {
+    }
+
+    [Route("/CinePersona/DevicePoll", "POST")]
+    [Authenticated]
+    public class CinePersonaDevicePollRequest
+    {
+        public string DeviceCode { get; set; }
+    }
+
+    public class DevicePollResult
+    {
+        public bool Success { get; set; }
+
+        public string Status { get; set; }
+
+        public string ApiKey { get; set; }
+
+        public string UserId { get; set; }
+
+        public string UserName { get; set; }
+    }
+
     public class CinePersonaActivityResponse
     {
         public bool Success { get; set; }
@@ -155,6 +181,107 @@ namespace Emby.Plugin.CinePersona
                 Enabled = profile.Enabled,
                 UserId = userId
             };
+        }
+
+        public async Task<object> Post(CinePersonaDeviceCodeRequest request)
+        {
+            var configuration = Plugin.Instance?.Configuration ?? new PluginConfiguration();
+            var baseUrl = string.IsNullOrWhiteSpace(configuration.ServerUrl)
+                ? "https://cinepersona.com"
+                : configuration.ServerUrl.Trim().TrimEnd('/');
+            if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var serverUri)
+                || (serverUri.Scheme != Uri.UriSchemeHttp && serverUri.Scheme != Uri.UriSchemeHttps))
+            {
+                throw new InvalidOperationException("CinePersona 服务器地址无效");
+            }
+
+            var endpoint = new Uri(serverUri, "/open/v1/device/code");
+            var payload = new { clientName = "Emby" };
+            using (var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint))
+            {
+                httpRequest.Content = new StringContent(
+                    _jsonSerializer.SerializeToString(payload),
+                    Encoding.UTF8,
+                    "application/json");
+
+                using (var timeout = new CancellationTokenSource(RequestTimeout))
+                using (var response = await HttpClient.SendAsync(httpRequest, timeout.Token).ConfigureAwait(false))
+                {
+                    var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        throw new InvalidOperationException(string.Format("CinePersona 申请设备码失败: {0}", responseBody));
+                    }
+                    return _jsonSerializer.DeserializeFromString<object>(responseBody);
+                }
+            }
+        }
+
+        public async Task<object> Post(CinePersonaDevicePollRequest request)
+        {
+            var plugin = Plugin.Instance;
+            var configuration = plugin?.Configuration ?? new PluginConfiguration();
+            var userId = GetCurrentUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                throw new InvalidOperationException("无法识别当前 Emby 用户");
+            }
+
+            var deviceCode = (request?.DeviceCode ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(deviceCode))
+            {
+                throw new ArgumentException("deviceCode 不能为空");
+            }
+
+            var baseUrl = string.IsNullOrWhiteSpace(configuration.ServerUrl)
+                ? "https://cinepersona.com"
+                : configuration.ServerUrl.Trim().TrimEnd('/');
+            if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var serverUri)
+                || (serverUri.Scheme != Uri.UriSchemeHttp && serverUri.Scheme != Uri.UriSchemeHttps))
+            {
+                throw new InvalidOperationException("CinePersona 服务器地址无效");
+            }
+
+            var endpoint = new Uri(serverUri, "/open/v1/device/poll");
+            var payload = new { deviceCode = deviceCode };
+            using (var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint))
+            {
+                httpRequest.Content = new StringContent(
+                    _jsonSerializer.SerializeToString(payload),
+                    Encoding.UTF8,
+                    "application/json");
+
+                using (var timeout = new CancellationTokenSource(RequestTimeout))
+                using (var response = await HttpClient.SendAsync(httpRequest, timeout.Token).ConfigureAwait(false))
+                {
+                    var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        throw new InvalidOperationException(string.Format("CinePersona 轮询设备码失败: {0}", responseBody));
+                    }
+
+                    try
+                    {
+                        var pollResult = _jsonSerializer.DeserializeFromString<DevicePollResult>(responseBody);
+                        if (pollResult != null && pollResult.Success && string.Equals(pollResult.Status, "approved", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(pollResult.ApiKey))
+                        {
+                            var profile = configuration.GetOrCreateUserProfile(userId);
+                            if (profile != null)
+                            {
+                                profile.ApiKey = pollResult.ApiKey.Trim();
+                                profile.Enabled = true;
+                                plugin?.SaveConfiguration();
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore parse exceptions on non-approved states
+                    }
+
+                    return _jsonSerializer.DeserializeFromString<object>(responseBody);
+                }
+            }
         }
 
         private string GetCurrentUserId()

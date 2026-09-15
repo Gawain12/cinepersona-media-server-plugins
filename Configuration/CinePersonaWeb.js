@@ -9,10 +9,10 @@
         }
     } catch (e) {}
 
-    if (window.__cinePersonaWebVersion === "0.2.12") {
+    if (window.__cinePersonaWebVersion === "0.3.0") {
         return;
     }
-    window.__cinePersonaWebVersion = "0.2.12";
+    window.__cinePersonaWebVersion = "0.3.0";
     window.__cinePersonaWebLoaded = true;
 
     var state = {
@@ -22,7 +22,8 @@
         rating: 0,
         hasSpoiler: false,
         activity: null,
-        settings: { Configured: false, Enabled: true }
+        settings: { Configured: false, Enabled: true },
+        pollTimer: null
     };
 
     function apiUrl(path) {
@@ -250,7 +251,8 @@
             ".cinepersona-review-card.theme-dark .cinepersona-review-action{border-color:#8eb2e4!important;color:#bcd4f2!important}" +
             ".cinepersona-review-card.theme-dark .cinepersona-review-action.primary{background:#4779b6!important;color:#fff!important}" +
             "@media (max-width:560px){.cinepersona-detail-button{padding:.5em .8em}.cinepersona-review-card{padding:16px;border-radius:13px}.cinepersona-review-stars{gap:0}.cinepersona-review-star{font-size:23px}}" +
-            ".cinepersona-detail-button{height:2.6em;min-height:2.6em;padding:0 .95em;font-size:1em;font-weight:600;line-height:1}.cinepersona-detail-button .cinepersona-btn-icon,.cinepersona-detail-button .cinepersona-btn-label{display:inline-flex;align-items:center;justify-content:center;height:1em;line-height:1;vertical-align:middle}.cinepersona-detail-button .cinepersona-btn-icon{width:1em;margin-right:.45em}.cinepersona-review-actions{align-items:center;flex-wrap:wrap}.cinepersona-review-action{font:650 14px/1.1 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.cinepersona-review-action-link{min-width:0;margin-right:auto;border-color:transparent;padding-left:0;padding-right:0;text-decoration:none;white-space:nowrap}.cinepersona-external-link{color:inherit;text-decoration:none}";
+            ".cinepersona-detail-button{height:2.6em;min-height:2.6em;padding:0 .95em;font-size:1em;font-weight:600;line-height:1}.cinepersona-detail-button .cinepersona-btn-icon,.cinepersona-detail-button .cinepersona-btn-label{display:inline-flex;align-items:center;justify-content:center;height:1em;line-height:1;vertical-align:middle}.cinepersona-detail-button .cinepersona-btn-icon{width:1em;margin-right:.45em}.cinepersona-review-actions{align-items:center;flex-wrap:wrap}.cinepersona-review-action{font:650 14px/1.1 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.cinepersona-review-action-link{min-width:0;margin-right:auto;border-color:transparent;padding-left:0;padding-right:0;text-decoration:none;white-space:nowrap}.cinepersona-external-link{color:inherit;text-decoration:none}" +
+            ".cinepersona-code-box{letter-spacing:4px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:26px;font-weight:700;text-align:center;padding:12px 10px;background:rgba(0,0,0,.06);border:1px dashed #315c9a;border-radius:10px;margin:12px 0 6px;user-select:all;cursor:pointer;transition:background .15s}.cinepersona-code-box:hover{background:rgba(0,0,0,.1)}.cinepersona-review-card.theme-dark .cinepersona-code-box{background:rgba(255,255,255,.08);color:#edf2f8;border-color:#8eb2e4}.cinepersona-review-card.theme-dark .cinepersona-code-box:hover{background:rgba(255,255,255,.14)}.cinepersona-code-hint{font-size:12px;color:#7b8797;text-align:center;margin:0 0 14px}.cinepersona-review-card.theme-dark .cinepersona-code-hint{color:#8f9ba8}.cinepersona-manual-toggle{color:#637083;font-size:12px;cursor:pointer;text-decoration:underline;background:none;border:none;padding:0;margin-top:14px;display:inline-block}.cinepersona-review-card.theme-dark .cinepersona-manual-toggle{color:#aab5c4}.cinepersona-pulse-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#315c9a;margin-right:6px;vertical-align:middle;animation:cinepersona-pulse 1.4s infinite ease-in-out}.cinepersona-review-card.theme-dark .cinepersona-pulse-dot{background:#8eb2e4}@keyframes cinepersona-pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}";
         document.head.appendChild(style);
     }
 
@@ -455,10 +457,16 @@
     }
 
     function closeModal() {
+        if (state.pollTimer) {
+            clearInterval(state.pollTimer);
+            state.pollTimer = null;
+        }
         if (!state.modal) {
             return;
         }
-        document.removeEventListener("keydown", state.modal.onKeyDown);
+        if (state.modal.onKeyDown) {
+            document.removeEventListener("keydown", state.modal.onKeyDown);
+        }
         state.modal.remove();
         state.modal = null;
     }
@@ -504,82 +512,332 @@
         modal.setAttribute("aria-modal", "true");
 
         var card = makeElement("div", "cinepersona-review-card" + (isDarkTheme() ? " theme-dark" : ""));
-        var title = makeElement("h2", "cinepersona-review-title", "连接 CinePersona");
-        var copy = makeElement("p", "cinepersona-review-copy", "当前 Emby 用户单独保存自己的观影记录和评分。");
-        var label = makeElement("label", "cinepersona-review-label", "API Key");
-        var input = makeElement("input", "cinepersona-review-text");
-        var keyLink = makeElement("a", "cinepersona-review-note", "获取 API Key ↗");
-        input.type = "password";
-        input.autocomplete = "off";
-        input.placeholder = settings.Configured ? "已配置，留空保持不变" : "cpk_…";
-        keyLink.href = "https://cinepersona.com/settings";
-        keyLink.target = "_blank";
-        keyLink.rel = "noopener noreferrer";
-        var enabledLabel = makeElement("label", "cinepersona-review-spoiler");
-        var enabledInput = document.createElement("input");
-        enabledInput.type = "checkbox";
-        enabledInput.checked = settings.Enabled !== false;
-        enabledLabel.appendChild(enabledInput);
-        enabledLabel.appendChild(document.createTextNode("启用同步"));
-        var status = makeElement("p", "cinepersona-review-status");
-        var actions = makeElement("div", "cinepersona-review-actions");
-        var cancel = makeElement("button", "cinepersona-review-action", "取消");
-        var submit = makeElement("button", "cinepersona-review-action primary", "保存");
-        cancel.type = "button";
-        submit.type = "button";
-        label.htmlFor = "cinepersona-settings-key";
-        input.id = "cinepersona-settings-key";
-        cancel.addEventListener("click", closeModal);
-        submit.addEventListener("click", function () {
-            if (!settings.Configured && !input.value.trim()) {
-                status.textContent = "请填写 API Key。";
-                return;
+
+        function renderConfiguredView() {
+            card.innerHTML = "";
+            var title = makeElement("h2", "cinepersona-review-title", "CinePersona 连接设置");
+            var copy = makeElement("p", "cinepersona-review-copy", "当前 Emby 用户已连接 CinePersona 账号。");
+
+            var enabledLabel = makeElement("label", "cinepersona-review-spoiler");
+            var enabledInput = document.createElement("input");
+            enabledInput.type = "checkbox";
+            enabledInput.checked = settings.Enabled !== false;
+            enabledLabel.appendChild(enabledInput);
+            enabledLabel.appendChild(document.createTextNode("启用同步"));
+
+            var rebindBtn = makeElement("button", "cinepersona-manual-toggle", "重新绑定账号");
+            rebindBtn.type = "button";
+            rebindBtn.style.display = "block";
+            rebindBtn.style.margin = "12px 0 6px";
+            rebindBtn.addEventListener("click", function () {
+                renderDeviceCodeView();
+            });
+
+            var manualToggle = makeElement("button", "cinepersona-manual-toggle", "修改 API Key（高级）");
+            manualToggle.type = "button";
+            var manualSection = makeElement("div");
+            manualSection.style.display = "none";
+            manualSection.style.marginTop = "10px";
+
+            var keyLabel = makeElement("label", "cinepersona-review-label", "API Key");
+            var keyInput = makeElement("input", "cinepersona-review-text");
+            keyInput.type = "password";
+            keyInput.autocomplete = "off";
+            keyInput.placeholder = "留空保持当前 Key 不变";
+            keyInput.style.minHeight = "38px";
+            keyInput.style.height = "38px";
+            keyInput.style.padding = "6px 10px";
+
+            var keyLink = makeElement("a", "cinepersona-review-note", "获取 API Key ↗");
+            keyLink.href = "https://cinepersona.com/settings";
+            keyLink.target = "_blank";
+            keyLink.rel = "noopener noreferrer";
+
+            manualSection.appendChild(keyLabel);
+            manualSection.appendChild(keyInput);
+            manualSection.appendChild(keyLink);
+
+            manualToggle.addEventListener("click", function () {
+                var isHidden = manualSection.style.display === "none";
+                manualSection.style.display = isHidden ? "block" : "none";
+                manualToggle.textContent = isHidden ? "收起 API Key" : "修改 API Key（高级）";
+            });
+
+            var status = makeElement("p", "cinepersona-review-status");
+            var actions = makeElement("div", "cinepersona-review-actions");
+            var cancel = makeElement("button", "cinepersona-review-action", "关闭");
+            var submit = makeElement("button", "cinepersona-review-action primary", "保存设置");
+            cancel.type = "button";
+            submit.type = "button";
+
+            cancel.addEventListener("click", closeModal);
+            submit.addEventListener("click", function () {
+                submit.disabled = true;
+                cancel.disabled = true;
+                status.style.color = "";
+                status.textContent = "正在保存…";
+
+                var payload = {
+                    Enabled: !!enabledInput.checked
+                };
+                var newKey = keyInput.value.trim();
+                if (newKey) {
+                    payload.ApiKey = newKey;
+                }
+
+                apiRequest("CinePersona/Settings", {
+                    method: "POST",
+                    body: JSON.stringify(payload)
+                }).then(function (result) {
+                    state.settings = {
+                        Configured: result && result.Configured !== undefined ? !!result.Configured : true,
+                        Enabled: result && result.Enabled !== undefined ? result.Enabled !== false : enabledInput.checked
+                    };
+                    status.style.color = "#238653";
+                    status.textContent = "已保存。";
+                    window.setTimeout(function () {
+                        closeModal();
+                        refresh();
+                    }, 450);
+                }).catch(function (error) {
+                    submit.disabled = false;
+                    cancel.disabled = false;
+                    status.textContent = "保存失败：" + (error && error.message ? error.message : "请稍后重试");
+                });
+            });
+
+            actions.appendChild(cancel);
+            actions.appendChild(submit);
+
+            card.appendChild(title);
+            card.appendChild(copy);
+            card.appendChild(enabledLabel);
+            card.appendChild(rebindBtn);
+            card.appendChild(manualToggle);
+            card.appendChild(manualSection);
+            card.appendChild(status);
+            card.appendChild(actions);
+        }
+
+        function renderDeviceCodeView() {
+            if (state.pollTimer) {
+                clearInterval(state.pollTimer);
+                state.pollTimer = null;
             }
 
-            submit.disabled = true;
-            cancel.disabled = true;
-            status.style.color = "";
-            status.textContent = "正在保存…";
-            apiRequest("CinePersona/Settings", {
-                method: "POST",
-                body: JSON.stringify({ ApiKey: input.value.trim(), Enabled: !!enabledInput.checked })
-            }).then(function (result) {
-                state.settings = {
-                    Configured: result && result.Configured !== undefined ? !!result.Configured : true,
-                    Enabled: result && result.Enabled !== undefined ? result.Enabled !== false : enabledInput.checked
-                };
-                status.style.color = "#238653";
-                status.textContent = "已保存。";
-                window.setTimeout(function () {
-                    closeModal();
-                    refresh();
-                }, 450);
-            }).catch(function (error) {
-                submit.disabled = false;
-                cancel.disabled = false;
-                status.textContent = "保存失败：" + (error && error.message ? error.message : "请稍后重试");
-            });
-        });
+            card.innerHTML = "";
+            var title = makeElement("h2", "cinepersona-review-title", "连接 CinePersona");
+            var copy = makeElement("p", "cinepersona-review-copy", "在浏览器中确认授权，即可自动完成绑定。");
+            var codeContainer = makeElement("div");
+            codeContainer.style.textAlign = "center";
+            var loadingText = makeElement("p", "cinepersona-review-copy", "正在申请设备授权码…");
+            codeContainer.appendChild(loadingText);
 
-        actions.appendChild(cancel);
-        actions.appendChild(submit);
-        card.appendChild(title);
-        card.appendChild(copy);
-        card.appendChild(label);
-        card.appendChild(input);
-        card.appendChild(keyLink);
-        card.appendChild(enabledLabel);
-        card.appendChild(status);
-        card.appendChild(actions);
+            var manualToggle = makeElement("button", "cinepersona-manual-toggle", "手动输入 API Key（高级）");
+            manualToggle.type = "button";
+
+            var manualSection = makeElement("div");
+            manualSection.style.display = "none";
+            manualSection.style.marginTop = "14px";
+
+            var keyLabel = makeElement("label", "cinepersona-review-label", "API Key");
+            var keyInput = makeElement("input", "cinepersona-review-text");
+            keyInput.type = "password";
+            keyInput.autocomplete = "off";
+            keyInput.placeholder = "cpk_…";
+            keyInput.style.minHeight = "38px";
+            keyInput.style.height = "38px";
+            keyInput.style.padding = "6px 10px";
+
+            var keyLink = makeElement("a", "cinepersona-review-note", "获取 API Key ↗");
+            keyLink.href = "https://cinepersona.com/settings";
+            keyLink.target = "_blank";
+            keyLink.rel = "noopener noreferrer";
+
+            var manualSaveBtn = makeElement("button", "cinepersona-review-action primary", "保存 Key");
+            manualSaveBtn.type = "button";
+            manualSaveBtn.style.marginTop = "8px";
+
+            manualSaveBtn.addEventListener("click", function () {
+                var val = keyInput.value.trim();
+                if (!val) {
+                    status.textContent = "请填写 API Key。";
+                    return;
+                }
+                if (state.pollTimer) {
+                    clearInterval(state.pollTimer);
+                    state.pollTimer = null;
+                }
+                manualSaveBtn.disabled = true;
+                status.style.color = "";
+                status.textContent = "正在保存…";
+                apiRequest("CinePersona/Settings", {
+                    method: "POST",
+                    body: JSON.stringify({ ApiKey: val, Enabled: true })
+                }).then(function (result) {
+                    state.settings = {
+                        Configured: result && result.Configured !== undefined ? !!result.Configured : true,
+                        Enabled: result && result.Enabled !== undefined ? result.Enabled !== false : true
+                    };
+                    status.style.color = "#238653";
+                    status.textContent = "已连接 CinePersona。";
+                    window.setTimeout(function () {
+                        closeModal();
+                        refresh();
+                    }, 450);
+                }).catch(function (error) {
+                    manualSaveBtn.disabled = false;
+                    status.textContent = "保存失败：" + (error && error.message ? error.message : "请稍后重试");
+                });
+            });
+
+            manualSection.appendChild(keyLabel);
+            manualSection.appendChild(keyInput);
+            manualSection.appendChild(keyLink);
+            manualSection.appendChild(manualSaveBtn);
+
+            manualToggle.addEventListener("click", function () {
+                var isHidden = manualSection.style.display === "none";
+                manualSection.style.display = isHidden ? "block" : "none";
+                manualToggle.textContent = isHidden ? "收起 API Key" : "手动输入 API Key（高级）";
+            });
+
+            var status = makeElement("p", "cinepersona-review-status");
+            var actions = makeElement("div", "cinepersona-review-actions");
+            var cancel = makeElement("button", "cinepersona-review-action", "取消");
+            cancel.type = "button";
+            cancel.addEventListener("click", closeModal);
+            actions.appendChild(cancel);
+
+            card.appendChild(title);
+            card.appendChild(copy);
+            card.appendChild(codeContainer);
+            card.appendChild(manualToggle);
+            card.appendChild(manualSection);
+            card.appendChild(status);
+            card.appendChild(actions);
+
+            apiRequest("CinePersona/DeviceCode", { method: "POST" }).then(function (data) {
+                if (!data || !data.userCode) {
+                    loadingText.textContent = "获取设备码失败，请重试或使用手动 Key。";
+                    return;
+                }
+
+                codeContainer.innerHTML = "";
+                var userCode = String(data.userCode || "");
+                var codeBox = makeElement("div", "cinepersona-code-box", userCode);
+                codeBox.title = "点击复制";
+
+                var codeHint = makeElement("p", "cinepersona-code-hint", "点击上方代码快速复制");
+
+                codeBox.addEventListener("click", function () {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(userCode).then(function () {
+                            codeHint.textContent = "已复制到剪贴板！";
+                            codeHint.style.color = "#238653";
+                            window.setTimeout(function () {
+                                codeHint.textContent = "点击上方代码快速复制";
+                                codeHint.style.color = "";
+                            }, 2000);
+                        }).catch(function () {});
+                    }
+                });
+
+                var verifyUrl = (data.verificationUrl || "https://cinepersona.com/activate") + "?code=" + encodeURIComponent(userCode);
+                var authLink = makeElement("a", "cinepersona-review-action primary", "打开网页授权 ↗");
+                authLink.href = verifyUrl;
+                authLink.target = "_blank";
+                authLink.rel = "noopener noreferrer";
+                authLink.style.display = "block";
+                authLink.style.textAlign = "center";
+                authLink.style.textDecoration = "none";
+                authLink.style.margin = "8px 0";
+
+                var pollStatus = makeElement("div");
+                pollStatus.style.marginTop = "12px";
+                pollStatus.style.fontSize = "13px";
+                pollStatus.style.textAlign = "center";
+                pollStatus.style.color = "#637083";
+                pollStatus.innerHTML = '<span class="cinepersona-pulse-dot"></span>等待授权中，完成后将自动连接…';
+
+                codeContainer.appendChild(codeBox);
+                codeContainer.appendChild(codeHint);
+                codeContainer.appendChild(authLink);
+                codeContainer.appendChild(pollStatus);
+
+                var intervalMs = Math.max(Number(data.interval || 3), 2) * 1000;
+                state.pollTimer = window.setInterval(function () {
+                    apiRequest("CinePersona/DevicePoll", {
+                        method: "POST",
+                        body: JSON.stringify({ DeviceCode: data.deviceCode })
+                    }).then(function (res) {
+                        if (!res) return;
+                        var s = (res.status || res.Status || "").toLowerCase();
+                        if (s === "approved") {
+                            if (state.pollTimer) {
+                                clearInterval(state.pollTimer);
+                                state.pollTimer = null;
+                            }
+                            state.settings = { Configured: true, Enabled: true };
+                            pollStatus.style.color = "#238653";
+                            var uName = res.userName || res.UserName || "";
+                            pollStatus.textContent = "✓ 授权成功！" + (uName ? "欢迎你，" + uName : "已连接 CinePersona。");
+                            window.setTimeout(function () {
+                                closeModal();
+                                refresh();
+                            }, 1200);
+                        } else if (s === "expired") {
+                            if (state.pollTimer) {
+                                clearInterval(state.pollTimer);
+                                state.pollTimer = null;
+                            }
+                            pollStatus.style.color = "#b42318";
+                            pollStatus.textContent = "授权码已过期。";
+                            var retryBtn = makeElement("button", "cinepersona-review-action", "重新获取");
+                            retryBtn.type = "button";
+                            retryBtn.style.marginTop = "8px";
+                            retryBtn.addEventListener("click", function () {
+                                renderDeviceCodeView();
+                            });
+                            pollStatus.appendChild(document.createElement("br"));
+                            pollStatus.appendChild(retryBtn);
+                        }
+                    }).catch(function () {
+                        // ignore temporary polling errors
+                    });
+                }, intervalMs);
+            }).catch(function (err) {
+                loadingText.textContent = "获取设备码失败：" + (err && err.message ? err.message : "网络错误");
+                var retryBtn = makeElement("button", "cinepersona-review-action", "重试");
+                retryBtn.type = "button";
+                retryBtn.style.marginTop = "8px";
+                retryBtn.addEventListener("click", function () {
+                    renderDeviceCodeView();
+                });
+                codeContainer.appendChild(retryBtn);
+            });
+        }
+
+        if (settings.Configured) {
+            renderConfiguredView();
+        } else {
+            renderDeviceCodeView();
+        }
+
         modal.appendChild(card);
         modal.addEventListener("click", function (event) {
             if (event.target === modal) {
                 closeModal();
             }
         });
+        modal.onKeyDown = function (event) {
+            if (event.key === "Escape") {
+                closeModal();
+            }
+        };
+        document.addEventListener("keydown", modal.onKeyDown);
         state.modal = modal;
         document.body.appendChild(modal);
-        input.focus();
     }
 
     function openModal() {

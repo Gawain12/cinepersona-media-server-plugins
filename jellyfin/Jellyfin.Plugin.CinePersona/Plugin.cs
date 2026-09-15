@@ -91,7 +91,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             }
 
             var contents = File.ReadAllText(indexPath);
-            var version = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "0.2.12";
+            var version = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "0.3.0";
             var expectedScript = string.Format("<script data-cinepersona-web=\"true\" src=\"/web/ConfigurationPage?name=CinePersonaWeb&v={0}\"></script>", version);
 
             if (contents.IndexOf(expectedScript, StringComparison.OrdinalIgnoreCase) >= 0)
