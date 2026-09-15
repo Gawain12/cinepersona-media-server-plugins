@@ -2,20 +2,19 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <RootNamespace>Emby.Plugin.CinePersona</RootNamespace>
-    <AssemblyName>Emby.Plugin.CinePersona</AssemblyName>
+    <AssemblyName>Emby.Plugin.CinePersona.Geek</AssemblyName>
     <Version>0.3.1</Version>
     <AssemblyVersion>0.3.1.0</AssemblyVersion>
     <FileVersion>0.3.1.0</FileVersion>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
+    <DefineConstants>$(DefineConstants);CINEPERSONA_GEEK</DefineConstants>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Compile against the Emby 4.8.10 API used by the current test host. -->
     <PackageReference Include="mediabrowser.server.core" Version="4.8.10" />
-    <!-- Pin the transitive common assemblies too; otherwise NuGet may select 4.8.11. -->
     <PackageReference Include="MediaBrowser.Common" Version="4.8.10" />
     <PackageReference Include="System.Memory" Version="4.5.5" />
   </ItemGroup>
@@ -23,6 +22,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Configuration/configPage.html" />
     <EmbeddedResource Include="Configuration/CinePersonaConfigurationPageJS.js" />
+    <EmbeddedResource Include="Configuration/CinePersonaWeb.js" />
     <EmbeddedResource Include="assets/emby-catalog-thumb.png" />
     <Compile Remove="jellyfin/**/*.cs" />
   </ItemGroup>

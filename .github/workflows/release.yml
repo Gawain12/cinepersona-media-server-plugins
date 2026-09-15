@@ -26,18 +26,10 @@ jobs:
           go-version: '1.24.x'
 
       - name: Build Emby marketplace plugin
-        run: >-
-          dotnet build Emby.Plugin.CinePersona.csproj -c Release
-          -p:CinePersonaFlavor=Marketplace
-          -p:BaseIntermediateOutputPath=obj/marketplace/
-          -p:OutputPath=bin/Release/netstandard2.0/marketplace/
+        run: dotnet build Emby.Plugin.CinePersona.csproj -c Release
 
       - name: Build Emby geek plugin
-        run: >-
-          dotnet build Emby.Plugin.CinePersona.csproj -c Release
-          -p:CinePersonaFlavor=Geek
-          -p:BaseIntermediateOutputPath=obj/geek/
-          -p:OutputPath=bin/Release/netstandard2.0/geek/
+        run: dotnet build Emby.Plugin.CinePersona.Geek.csproj -c Release
 
       - name: Build Jellyfin plugin
         run: dotnet build jellyfin/Jellyfin.Plugin.CinePersona/Jellyfin.Plugin.CinePersona.csproj -c Release
@@ -51,8 +43,8 @@ jobs:
       - name: Package release artifacts
         run: |
           mkdir -p dist
-          cp bin/Release/netstandard2.0/marketplace/Emby.Plugin.CinePersona.dll dist/
-          cp bin/Release/netstandard2.0/geek/Emby.Plugin.CinePersona.Geek.dll dist/
+          cp bin/Release/netstandard2.0/Emby.Plugin.CinePersona.dll dist/
+          cp bin/Release/netstandard2.0/Emby.Plugin.CinePersona.Geek.dll dist/
           mkdir -p dist/jellyfin
           cp jellyfin/Jellyfin.Plugin.CinePersona/bin/Release/net8.0/Jellyfin.Plugin.CinePersona.dll dist/
           cp jellyfin/Jellyfin.Plugin.CinePersona/bin/Release/net8.0/Jellyfin.Plugin.CinePersona.dll dist/jellyfin/

@@ -57,11 +57,11 @@ Emby 输出文件位于：
 
 Marketplace 输出文件位于：
 
-`bin/Release/netstandard2.0/marketplace/Emby.Plugin.CinePersona.dll`
+`bin/Release/netstandard2.0/Emby.Plugin.CinePersona.dll`
 
 Geek 输出文件位于：
 
-`bin/Release/netstandard2.0/geek/Emby.Plugin.CinePersona.Geek.dll`
+`bin/Release/netstandard2.0/Emby.Plugin.CinePersona.Geek.dll`
 
 Jellyfin 和 Plex 的说明分别见 [jellyfin/README.md](jellyfin/README.md) 与 [plex/README.md](plex/README.md)。
 
