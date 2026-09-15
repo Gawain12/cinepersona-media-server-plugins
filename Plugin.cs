@@ -20,7 +20,9 @@ namespace Emby.Plugin.CinePersona
             : base(applicationPaths, xmlSerializer)
         {
             Instance = this;
+#if CINEPERSONA_GEEK
             InjectWebScript(applicationPaths);
+#endif
         }
 
         public override string Name => "CinePersona";
@@ -38,7 +40,7 @@ namespace Emby.Plugin.CinePersona
 
         public IEnumerable<PluginPageInfo> GetPages()
         {
-            return new[]
+            var pages = new List<PluginPageInfo>
             {
                 new PluginPageInfo
                 {
@@ -49,15 +51,21 @@ namespace Emby.Plugin.CinePersona
                 {
                     Name = "CinePersonaConfigurationPageJS",
                     EmbeddedResourcePath = GetType().Namespace + ".Configuration.CinePersonaConfigurationPageJS.js"
-                },
-                new PluginPageInfo
-                {
-                    Name = "CinePersonaWeb",
-                    EmbeddedResourcePath = GetType().Namespace + ".Configuration.CinePersonaWeb.js"
                 }
             };
+
+#if CINEPERSONA_GEEK
+            pages.Add(new PluginPageInfo
+            {
+                Name = "CinePersonaWeb",
+                EmbeddedResourcePath = GetType().Namespace + ".Configuration.CinePersonaWeb.js"
+            });
+#endif
+
+            return pages;
         }
 
+#if CINEPERSONA_GEEK
         private static void InjectWebScript(IApplicationPaths applicationPaths)
         {
             try
@@ -75,7 +83,7 @@ namespace Emby.Plugin.CinePersona
                 }
 
                 var contents = File.ReadAllText(indexPath);
-                var version = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "0.3.0";
+                var version = typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "0.3.1";
                 var expectedScript = string.Format("<script data-cinepersona-web=\"true\" src=\"/web/ConfigurationPage?name=CinePersonaWeb&v={0}\"></script>", version);
 
                 if (contents.IndexOf(expectedScript, StringComparison.OrdinalIgnoreCase) >= 0)
@@ -105,5 +113,6 @@ namespace Emby.Plugin.CinePersona
                 // the next server restart.
             }
         }
+#endif
     }
 }

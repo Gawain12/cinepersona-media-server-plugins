@@ -16,6 +16,12 @@ dotnet build Jellyfin.Plugin.CinePersona/Jellyfin.Plugin.CinePersona.csproj -c R
 
 ## 安装
 
-将生成的 DLL 放入 Jellyfin 的插件目录下以插件名命名的子目录，重启 Jellyfin，然后在插件设置中填写 CinePersona API Key 和服务器地址。重启后打开 Jellyfin Web 的电影详情页并硬刷新一次，操作栏会出现“评分”按钮，已有评分显示为 `7/10` 形式；手机、电视等原生客户端暂不注入此按钮。
+在 Jellyfin 控制台 → 插件 → 存储库中添加：
+
+`https://cinepersona.com/jellyfin.json`
+
+然后在插件目录中安装 CinePersona。也可以使用 GitHub Release 中的 ZIP 包手动安装。
+
+安装后重启 Jellyfin，然后打开 Jellyfin Web 的电影详情页并硬刷新一次，操作栏会出现“评分”按钮，已有评分显示为 `7/10` 形式；手机、电视等原生客户端暂不注入此按钮。
 
 API Key 只需要 `sync.write` 权限。

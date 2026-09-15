@@ -3,13 +3,16 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <RootNamespace>Emby.Plugin.CinePersona</RootNamespace>
     <AssemblyName>Emby.Plugin.CinePersona</AssemblyName>
-    <Version>0.3.0</Version>
-    <AssemblyVersion>0.3.0.0</AssemblyVersion>
-    <FileVersion>0.3.0.0</FileVersion>
+    <Version>0.3.1</Version>
+    <AssemblyVersion>0.3.1.0</AssemblyVersion>
+    <FileVersion>0.3.1.0</FileVersion>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <CinePersonaFlavor Condition="'$(CinePersonaFlavor)' == ''">Marketplace</CinePersonaFlavor>
+    <DefineConstants Condition="'$(CinePersonaFlavor)' == 'Geek'">$(DefineConstants);CINEPERSONA_GEEK</DefineConstants>
+    <AssemblyName Condition="'$(CinePersonaFlavor)' == 'Geek'">Emby.Plugin.CinePersona.Geek</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,7 +26,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Configuration/configPage.html" />
     <EmbeddedResource Include="Configuration/CinePersonaConfigurationPageJS.js" />
-    <EmbeddedResource Include="Configuration/CinePersonaWeb.js" />
+    <EmbeddedResource Include="Configuration/CinePersonaWeb.js" Condition="'$(CinePersonaFlavor)' == 'Geek'" />
     <EmbeddedResource Include="assets/emby-catalog-thumb.png" />
     <Compile Remove="jellyfin/**/*.cs" />
   </ItemGroup>

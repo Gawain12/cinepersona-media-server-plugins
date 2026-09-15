@@ -1,3 +1,4 @@
+#if CINEPERSONA_GEEK
 using System;
 using System.Net.Http;
 using System.Text;
@@ -442,3 +443,4 @@ namespace Emby.Plugin.CinePersona
         }
     }
 }
+#endif

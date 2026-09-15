@@ -19,11 +19,25 @@ jobs:
             8.0.x
             9.0.x
 
-      - name: Restore Emby plugin
-        run: dotnet restore Emby.Plugin.CinePersona.csproj
+      - name: Restore Emby marketplace plugin
+        run: >-
+          dotnet restore Emby.Plugin.CinePersona.csproj
+          -p:CinePersonaFlavor=Marketplace
+          -p:BaseIntermediateOutputPath=obj/marketplace/
 
-      - name: Build Emby plugin
-        run: dotnet build Emby.Plugin.CinePersona.csproj -c Release --no-restore
+      - name: Build Emby marketplace plugin
+        run: >-
+          dotnet build Emby.Plugin.CinePersona.csproj -c Release --no-restore
+          -p:CinePersonaFlavor=Marketplace
+          -p:BaseIntermediateOutputPath=obj/marketplace/
+          -p:OutputPath=bin/Release/netstandard2.0/marketplace/
+
+      - name: Build Emby geek plugin
+        run: >-
+          dotnet build Emby.Plugin.CinePersona.csproj -c Release
+          -p:CinePersonaFlavor=Geek
+          -p:BaseIntermediateOutputPath=obj/geek/
+          -p:OutputPath=bin/Release/netstandard2.0/geek/
 
       - name: Restore Jellyfin plugin
         run: dotnet restore jellyfin/Jellyfin.Plugin.CinePersona/Jellyfin.Plugin.CinePersona.csproj
@@ -37,7 +51,7 @@ jobs:
           name: cinepersona-plugins-${{ github.sha }}
           if-no-files-found: error
           path: |
-            **/bin/Release/**/Emby.Plugin.CinePersona.dll
+            **/bin/Release/**/Emby.Plugin.CinePersona*.dll
             **/bin/Release/**/Jellyfin.Plugin.CinePersona.dll
 
       - name: Test Plex relay

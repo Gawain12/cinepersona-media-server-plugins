@@ -8,17 +8,24 @@ CinePersona 的媒体服务器同步插件集合：电影播放完成度达到 8
 - `jellyfin/Jellyfin.Plugin.CinePersona`：Jellyfin 原生 C# 插件。
 - `plex/CinePersona.PlexRelay`：Plex Webhook companion relay。Plex 官方目前没有等价的稳定原生服务端播放事件插件接口，因此这个组件负责接收 Plex Webhook 并转发到 CinePersona；它不绕过 Plex Pass 限制。
 
+## Emby 发布通道
+
+- **Marketplace build**：`Emby.Plugin.CinePersona.dll`。只使用 Emby 原生插件配置页和服务端事件，不修改 Emby 网页文件、不注入 JavaScript；提供电影观看状态、个人评分同步和反向同步，作为官方目录审核版本。
+- **Geek build**：`Emby.Plugin.CinePersona.Geek.dll`。额外注入 Emby Web 电影详情页评分/短评入口，仅供愿意自行安装和承担网页注入风险的用户使用。不要与 Marketplace build 同时安装。
+
 插件发送到 CinePersona 的实际 API 路径是 `/v1/webhook/emby`、`/v1/webhook/jellyfin` 和 `/v1/webhook/plex`；服务器地址只需要填写 `https://cinepersona.com` 或 `https://test.gawyn.de`。
 
-## Emby 支持内容
+## Emby Marketplace build 支持内容
 
-- Emby Server 4.7+
+- Emby Server 4.8.x（当前按 4.8.10 API 构建）
 - 仅处理 `Movie`
 - 仅在 `PositionTicks / RunTimeTicks >= 0.8` 时同步
-- 支持 Emby 电影个人评分同步；网页入口会回显 CinePersona 当前评分和短评
-- Web 电影详情页提供“评分”入口：可提交评分、短评和剧透标记
+- 支持 Emby 电影个人评分同步
+- 不修改 Emby 网页文件，不注入 JavaScript，不提供网页评分入口
 - 自动携带 TMDB ID、IMDb ID、片名和年份
 - 支持 CinePersona 正式环境和测试环境
+
+Geek build 在以上基础上增加 Web 电影详情页的评分、短评和剧透标记入口；它会修改 Emby Web 的 `dashboard-ui/index.html`，仅供自行安装的极客用户使用。
 
 ## 视觉资源
 
@@ -26,12 +33,12 @@ CinePersona 的媒体服务器同步插件集合：电影播放完成度达到 8
 
 ## 安装
 
-1. 在 CinePersona 中创建 API Key，并授予 `sync.write` 权限；若要使用 CinePersona 评分/短评回显，优先同时授予 `library.read`。
-2. 从 GitHub Releases 下载 `Emby.Plugin.CinePersona.dll`。
-3. 将 DLL 放入 Emby Server 的 `plugins` 目录。
-4. 重启 Emby Server。
-5. 在 Emby 后台的插件设置中填写 API Key 和 CinePersona 地址。
-6. 打开 Emby Web 的电影详情页，刷新一次页面；操作栏会出现“评分”按钮，已有评分显示为 `7/10` 形式。原生 Emby 客户端暂不注入此按钮。
+1. 在 CinePersona 中创建 API Key，并授予 `sync.write` 权限。
+2. 从 GitHub Releases 下载 `Emby.Plugin.CinePersona.dll`（审核版）。
+3. 将 DLL 放入 Emby Server 的 `plugins` 目录并重启。
+4. 在 Emby 后台插件设置中填写 API Key 和 CinePersona 地址。
+
+需要网页评分弹窗的用户下载 `Emby.Plugin.CinePersona.Geek.dll`，不要与审核版同时安装。
 
 默认地址：`https://cinepersona.com`
 
@@ -48,7 +55,13 @@ go test ./...
 
 Emby 输出文件位于：
 
-`bin/Release/netstandard2.0/Emby.Plugin.CinePersona.dll`
+Marketplace 输出文件位于：
+
+`bin/Release/netstandard2.0/marketplace/Emby.Plugin.CinePersona.dll`
+
+Geek 输出文件位于：
+
+`bin/Release/netstandard2.0/geek/Emby.Plugin.CinePersona.Geek.dll`
 
 Jellyfin 和 Plex 的说明分别见 [jellyfin/README.md](jellyfin/README.md) 与 [plex/README.md](plex/README.md)。
 
