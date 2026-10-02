@@ -475,7 +475,7 @@ public sealed class ServerEntryPoint : IHostedService
         }
     }
 
-    private async Task SyncPlaybackAsync(PlaybackStopEventArgs e, string userId)
+    private async Task SyncPlaybackAsync(PlaybackStopEventArgs e, string? userId)
     {
         if (e?.Item is Episode episode)
         {
@@ -483,7 +483,7 @@ public sealed class ServerEntryPoint : IHostedService
                 e.Session?.DeviceId, true, true, e.MediaInfo?.RunTimeTicks).ConfigureAwait(false);
             return;
         }
-        if (e.Item is not Movie movie)
+        if (e?.Item is not Movie movie)
         {
             return;
         }
@@ -613,13 +613,13 @@ public sealed class ServerEntryPoint : IHostedService
         catch (Exception ex) { _logger.LogError(ex, "CinePersona episode progress sync failed"); }
     }
 
-    private async Task SyncEpisodeAsync(Episode episode, long positionTicks, string userId,
-        string deviceId, bool paused, bool force, long? durationTicks = null)
+    private async Task SyncEpisodeAsync(Episode episode, long positionTicks, string? userId,
+        string? deviceId, bool paused, bool force, long? durationTicks = null)
     {
         // Multi-episode files have one timeline; do not attribute it to a single episode.
         if (episode.IndexNumberEnd.HasValue && episode.IndexNumberEnd != episode.IndexNumber) return;
         var configuration = Plugin.Instance?.Configuration;
-        if (configuration == null) return;
+        if (configuration == null || string.IsNullOrWhiteSpace(userId)) return;
         var profile = configuration.FindUserProfile(userId);
         if (profile == null && string.Equals(configuration.SyncUserId, userId, StringComparison.OrdinalIgnoreCase))
             profile = new UserSyncProfile { UserId = userId, ApiKey = configuration.ApiKey, Enabled = true };
@@ -627,10 +627,10 @@ public sealed class ServerEntryPoint : IHostedService
         var series = episode.Series;
         if (series == null || series.ProviderIds == null) return;
         series.ProviderIds.TryGetValue("Tvdb", out var showTvdbId);
-        string episodeTvdbId = null;
+        string? episodeTvdbId = null;
         episode.ProviderIds?.TryGetValue("Tvdb", out episodeTvdbId);
         await _tvProgress.SendAsync(configuration.ServerUrl, profile.ApiKey, userId,
-            showTvdbId, episodeTvdbId, episode.ParentIndexNumber, episode.IndexNumber,
+            showTvdbId ?? string.Empty, episodeTvdbId ?? string.Empty, episode.ParentIndexNumber, episode.IndexNumber,
             positionTicks, durationTicks ?? episode.RunTimeTicks ?? 0, paused, force, "Jellyfin", deviceId).ConfigureAwait(false);
     }
 

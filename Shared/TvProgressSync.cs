@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -18,7 +19,7 @@ namespace CinePersona.MediaSync
         private readonly object gate = new object();
         private readonly Dictionary<string, ObservationState> states = new Dictionary<string, ObservationState>();
 
-        public TvProgressSync(HttpClient client, Func<object, string> serialize, Func<DateTime> clock = null)
+        public TvProgressSync(HttpClient client, Func<object, string> serialize, Func<DateTime>? clock = null)
         {
             this.client = client;
             this.serialize = serialize;
@@ -28,7 +29,7 @@ namespace CinePersona.MediaSync
         public async Task<bool> SendAsync(string serverUrl, string apiKey, string userId,
             string seriesTvdbId, string episodeTvdbId, int? season, int? episode,
             long positionTicks, long durationTicks, bool paused, bool force,
-            string platform, string deviceId)
+            string platform, string? deviceId)
         {
             if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(userId)
                 || !int.TryParse(seriesTvdbId, NumberStyles.None, CultureInfo.InvariantCulture, out var showId) || showId <= 0
@@ -40,7 +41,7 @@ namespace CinePersona.MediaSync
                 return false;
             var baseUrl = string.IsNullOrWhiteSpace(serverUrl) ? "https://cinepersona.com" : serverUrl.Trim().TrimEnd('/');
             if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var serverUri)
-                || (serverUri.Scheme != Uri.UriSchemeHttp && serverUri.Scheme != Uri.UriSchemeHttps))
+                || serverUri == null || (serverUri.Scheme != Uri.UriSchemeHttp && serverUri.Scheme != Uri.UriSchemeHttps))
                 return false;
 
             deviceId = deviceId ?? string.Empty;
@@ -76,7 +77,7 @@ namespace CinePersona.MediaSync
             };
             // Exact TVDB episode ID avoids DVD/absolute numbering mismatches.
             if (hasEpisodeId) payload["tvdbEpisodeId"] = episodeId;
-            else { payload["season"] = season.Value; payload["episode"] = episode.Value; }
+            else { payload["season"] = season.GetValueOrDefault(); payload["episode"] = episode.GetValueOrDefault(); }
             var json = serialize(payload);
             var endpoint = new Uri(serverUri, "/open/v1/me/tv/tvdb:" + showId.ToString(CultureInfo.InvariantCulture) + "/progress");
             for (var attempt = 0; attempt < 2; attempt++)

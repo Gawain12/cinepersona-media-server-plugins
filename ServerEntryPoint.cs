@@ -134,7 +134,7 @@ namespace Emby.Plugin.CinePersona
                     e.Session?.DeviceId, true, true, e.MediaInfo?.RunTimeTicks).ConfigureAwait(false);
                 return;
             }
-            if (!(e.Item is Movie movie))
+            if (!(e?.Item is Movie movie))
             {
                 return;
             }
