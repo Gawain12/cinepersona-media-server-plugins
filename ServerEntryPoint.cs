@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using Emby.Plugin.CinePersona.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
+using MediaBrowser.Controller.Entities.TV;
+using CinePersona.MediaSync;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Plugins;
 using MediaBrowser.Controller.Session;
@@ -26,6 +28,7 @@ namespace Emby.Plugin.CinePersona
         private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
         private static readonly HttpClient HttpClient = new HttpClient();
 
+        private readonly TvProgressSync _tvProgress;
         private readonly ISessionManager _sessionManager;
         private readonly IUserDataManager _userDataManager;
         private readonly IUserManager _userManager;
@@ -49,10 +52,13 @@ namespace Emby.Plugin.CinePersona
             _libraryManager = libraryManager;
             _logger = logManager.GetLogger("CinePersona");
             _jsonSerializer = jsonSerializer;
+            _tvProgress = new TvProgressSync(HttpClient, value => _jsonSerializer.SerializeToString(value));
         }
 
         public void Run()
         {
+            _sessionManager.PlaybackStart += OnEpisodePlaybackProgress;
+            _sessionManager.PlaybackProgress += OnEpisodePlaybackProgress;
             _sessionManager.PlaybackStopped += OnPlaybackStopped;
             _userDataManager.UserDataSaved += OnUserDataSaved;
             _reverseSyncTimer = new Timer(
@@ -76,6 +82,19 @@ namespace Emby.Plugin.CinePersona
 
         private async void OnUserDataSaved(object sender, UserDataSaveEventArgs e)
         {
+            if (e?.Item is Episode tvEpisode && e.UserData != null)
+            {
+                if (e.SaveReason == UserDataSaveReason.TogglePlayed && e.UserData.Played)
+                {
+                    try
+                    {
+                        await SyncEpisodeAsync(tvEpisode, tvEpisode.RunTimeTicks ?? 0, e.User?.Id.ToString(),
+                            "manual", true, true).ConfigureAwait(false);
+                    }
+                    catch (Exception ex) { _logger.ErrorException("CinePersona 剧集看过同步失败", ex); }
+                }
+                return;
+            }
             // Emby uses TogglePlayed when the user clicks "Mark as played".
             // PlaybackStopped does not fire for that action, so treat it as a
             // completed movie at 100% and send the same server-side event.
@@ -109,7 +128,13 @@ namespace Emby.Plugin.CinePersona
 
         private async Task SyncPlaybackAsync(PlaybackStopEventArgs e, string userId)
         {
-            if (!(e.Item is Movie movie))
+            if (e?.Item is Episode episode)
+            {
+                await SyncEpisodeAsync(episode, e.PlaybackPositionTicks ?? 0, userId,
+                    e.Session?.DeviceId, true, true, e.MediaInfo?.RunTimeTicks).ConfigureAwait(false);
+                return;
+            }
+            if (!(e?.Item is Movie movie))
             {
                 return;
             }
@@ -538,6 +563,39 @@ namespace Emby.Plugin.CinePersona
             }
         }
 
+        private async void OnEpisodePlaybackProgress(object sender, PlaybackProgressEventArgs e)
+        {
+            if (!(e?.Item is Episode episode)) return;
+            try
+            {
+                await SyncEpisodeAsync(episode, e.PlaybackPositionTicks ?? 0,
+                    e.Session?.UserId.ToString(), e.DeviceId ?? e.Session?.DeviceId,
+                    e.IsPaused, false, e.MediaInfo?.RunTimeTicks).ConfigureAwait(false);
+            }
+            catch (Exception ex) { _logger.ErrorException("CinePersona 剧集进度同步失败", ex); }
+        }
+
+        private async Task SyncEpisodeAsync(Episode episode, long positionTicks, string userId,
+            string deviceId, bool paused, bool force, long? durationTicks = null)
+        {
+            // Multi-episode files have one timeline; do not attribute it to a single episode.
+            if (episode.IndexNumberEnd.HasValue && episode.IndexNumberEnd != episode.IndexNumber) return;
+            var configuration = Plugin.Instance?.Configuration;
+            if (configuration == null) return;
+            var profile = configuration.FindUserProfile(userId);
+            if (profile == null && string.Equals(configuration.SyncUserId, userId, StringComparison.OrdinalIgnoreCase))
+                profile = new UserSyncProfile { UserId = userId, ApiKey = configuration.ApiKey, Enabled = true };
+            if (profile?.Enabled != true) return;
+            var series = episode.Series;
+            if (series == null || series.ProviderIds == null) return;
+            series.ProviderIds.TryGetValue("Tvdb", out var showTvdbId);
+            string episodeTvdbId = null;
+            episode.ProviderIds?.TryGetValue("Tvdb", out episodeTvdbId);
+            await _tvProgress.SendAsync(configuration.ServerUrl, profile.ApiKey, userId,
+                showTvdbId, episodeTvdbId, episode.ParentIndexNumber, episode.IndexNumber,
+                positionTicks, durationTicks ?? episode.RunTimeTicks ?? 0, paused, force, "Emby", deviceId).ConfigureAwait(false);
+        }
+
         internal static bool HasReachedCompletion(long runtimeTicks, long positionTicks)
         {
             return runtimeTicks > 0
@@ -548,6 +606,8 @@ namespace Emby.Plugin.CinePersona
         public void Dispose()
         {
             _reverseSyncTimer?.Dispose();
+            _sessionManager.PlaybackStart -= OnEpisodePlaybackProgress;
+            _sessionManager.PlaybackProgress -= OnEpisodePlaybackProgress;
             _sessionManager.PlaybackStopped -= OnPlaybackStopped;
             _userDataManager.UserDataSaved -= OnUserDataSaved;
         }

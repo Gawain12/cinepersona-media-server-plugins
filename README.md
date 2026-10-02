@@ -68,3 +68,20 @@ Jellyfin 和 Plex 的说明分别见 [jellyfin/README.md](jellyfin/README.md) �
 ## 隐私与安全
 
 插件只向配置的 CinePersona 地址发送观影事件和媒体识别信息，不会抓取 IMDb 或其他外部网站，也不会上传视频文件。
+
+## 剧集进度（1.2.0，测试版）
+
+Emby Marketplace、Geek 和 Jellyfin 共用单集进度逻辑。配置测试站
+`https://test.gawyn.de` 和具有 `sync.write` 权限的个人 API Key 后，播放开始、
+每 30 秒、暂停、停止会保存单集的秒数和百分比，80% 起记录该集看过。
+手动标记单集看过也会同步；不会代替整季评分，也不会把单集计入电影品味。
+
+关联要求剧集的 TVDB ID；优先使用单集 TVDB ID，否则使用季号和集号。
+缺少时长、缺少 ID、合并多集文件或服务端条目缺失/编号冲突会跳过，
+不按片名猜测。重试保留原始时间，倒退和重看允许降低当前进度。
+断网期间尚无持久离线队列。电影的原有双向看过/评分同步保持原状；
+本测试版新增的是服务端播放进度上传，尚不自动把网站进度写回媒体服务器续播点。
+
+构建：上面的三个项目分别生成对应 DLL，Marketplace 和 Geek 不可同时安装。
+测试：`dotnet run --project tests/TvProgress/TvProgress.csproj -c Release`。
+暂未更新正式目录、自动升级或线上媒体服务器安装。

@@ -34,6 +34,9 @@ jobs:
       - name: Build Jellyfin plugin
         run: dotnet build jellyfin/Jellyfin.Plugin.CinePersona/Jellyfin.Plugin.CinePersona.csproj -c Release --no-restore
 
+      - name: Test TV progress contract
+        run: dotnet run --project tests/TvProgress/TvProgress.csproj -c Release
+
       - name: Upload plugin binaries
         uses: actions/upload-artifact@v4
         with:

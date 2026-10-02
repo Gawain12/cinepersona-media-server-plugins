@@ -3,9 +3,9 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <RootNamespace>Emby.Plugin.CinePersona</RootNamespace>
     <AssemblyName>Emby.Plugin.CinePersona.Geek</AssemblyName>
-    <Version>0.3.1</Version>
-    <AssemblyVersion>0.3.1.0</AssemblyVersion>
-    <FileVersion>0.3.1.0</FileVersion>
+    <Version>1.2.0</Version>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <FileVersion>1.2.0.0</FileVersion>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
@@ -25,5 +25,6 @@
     <EmbeddedResource Include="Configuration/CinePersonaWeb.js" />
     <EmbeddedResource Include="assets/emby-catalog-thumb.png" />
     <Compile Remove="jellyfin/**/*.cs" />
+    <Compile Remove="tests/**/*.cs" />
   </ItemGroup>
 </Project>
